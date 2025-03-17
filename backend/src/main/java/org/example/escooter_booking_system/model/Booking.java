@@ -2,12 +2,19 @@ package org.example.escooter_booking_system.model;
 
 import jakarta.persistence.*;
 import java.util.Date;
+import java.util.List;
 
 @Entity
 public class Booking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @OneToOne(mappedBy = "booking", cascade = CascadeType.ALL)
+    private Payment payment;
+
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL)
+    private List<FaultReport> faultReports;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
@@ -24,7 +31,10 @@ public class Booking {
     private Date endTime;
 
     @Column(nullable = false)
-    private String status = "ACTIVE";
+    private String status = "ACTIVE"; // ACTIVE, COMPLETED, CANCELLED, FAULT_REPORTED
+
+    @Column(nullable = false)
+    private Boolean hasFault = false;
 
     @Column(nullable = false)
     private Date createdAt = new Date();
@@ -78,11 +88,27 @@ public class Booking {
         this.status = status;
     }
 
+    public Boolean getHasFault() {
+        return hasFault;
+    }
+
+    public void setHasFault(Boolean hasFault) {
+        this.hasFault = hasFault;
+    }
+
     public Date getCreatedAt() {
         return createdAt;
     }
 
     public void setCreatedAt(Date createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Payment getPayment() {
+        return payment;
+    }
+
+    public void setPayment(Payment payment) {
+        this.payment = payment;
     }
 }

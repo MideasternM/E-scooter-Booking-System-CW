@@ -2,7 +2,7 @@
   <div class="home">
     <div class="hero">
       <h1>Welcome to E-Scooter Booking System</h1>
-      <p class="subtitle">Your eco-friendly transportation solution</p>
+      <p class="subtitle">Your Green Transportation Solution</p>
       <div class="cta-buttons">
         <router-link v-if="!isLoggedIn" to="/login" class="btn primary">Login</router-link>
         <router-link v-if="!isLoggedIn" to="/register" class="btn secondary">Register</router-link>
@@ -27,35 +27,26 @@
   </div>
 </template>
 
-<script lang="ts">
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
-export default {
-  setup() {
-    const isLoggedIn = ref(false)
-    const router = useRouter()
+const isLoggedIn = ref(false)
+const router = useRouter()
 
-    const checkLoginStatus = () => {
-      isLoggedIn.value = !!localStorage.getItem('token')
-    }
-
-    const logout = () => {
-      localStorage.removeItem('token')
-      isLoggedIn.value = false
-      router.push('/')
-    }
-
-    onMounted(() => {
-      checkLoginStatus()
-    })
-
-    return {
-      isLoggedIn,
-      logout
-    }
-  }
+const checkLoginStatus = () => {
+  isLoggedIn.value = !!localStorage.getItem('token')
 }
+
+const logout = () => {
+  localStorage.removeItem('token')
+  isLoggedIn.value = false
+  router.push('/')
+}
+
+onMounted(() => {
+  checkLoginStatus()
+})
 </script>
 
 <style scoped>
@@ -212,3 +203,4 @@ export default {
   }
 }
 </style>
+

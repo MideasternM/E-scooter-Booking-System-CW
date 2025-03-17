@@ -2,6 +2,7 @@ package org.example.escooter_booking_system.model;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Entity
 public class Scooter {
@@ -23,6 +24,9 @@ public class Scooter {
 
     @Column(nullable = false)
     private Boolean isAvailable = true;
+
+    @OneToMany(mappedBy = "scooter", cascade = CascadeType.ALL)
+    private List<Booking> bookings;
 
     // Getters and Setters
     public Long getId() {
@@ -71,5 +75,13 @@ public class Scooter {
 
     public void setAvailable(Boolean available) {
         isAvailable = available;
+    }
+
+    public List<Booking> getBookings() {
+        return bookings;
+    }
+
+    public void setBookings(List<Booking> bookings) {
+        this.bookings = bookings;
     }
 }
