@@ -1,6 +1,7 @@
 package org.example.escooter_booking_system.controller;
 
 import org.example.escooter_booking_system.model.User;
+import org.example.escooter_booking_system.model.LoginRequest;
 import org.example.escooter_booking_system.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -20,9 +21,8 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<User> loginUser(@RequestParam String username,
-            @RequestParam String password) {
-        User user = userService.authenticateUser(username, password);
+    public ResponseEntity<User> loginUser(@RequestBody LoginRequest loginRequest) {
+        User user = userService.authenticateUser(loginRequest.getUsername(), loginRequest.getPassword());
         if (user != null) {
             return ResponseEntity.ok(user);
         }

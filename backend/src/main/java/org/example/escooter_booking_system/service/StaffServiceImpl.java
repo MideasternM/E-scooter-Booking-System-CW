@@ -6,6 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class StaffServiceImpl implements StaffService {
@@ -87,4 +90,22 @@ public class StaffServiceImpl implements StaffService {
         }
         return null;
     }
-} 
+
+    @Override
+    public Map<String, Object> authenticateStaff(String staffNumber, String password) {
+        Map<String, Object> result = new HashMap<>();
+        Staff staff = staffRepository.findByStaffNumber(staffNumber);
+
+        if (staff != null && staff.getPassword() != null && staff.getPassword().equals(password)) {
+            // Generate a simple token for authentication
+            String token = UUID.randomUUID().toString();
+
+            // Create response with staff info and token
+            result.put("token", token);
+            result.put("staff", staff);
+            return result;
+        }
+
+        return null;
+    }
+}

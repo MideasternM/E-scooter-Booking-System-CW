@@ -2,38 +2,42 @@ package org.example.escooter_booking_system.service;
 
 import org.example.escooter_booking_system.model.Staff;
 import java.util.List;
+import java.util.Map;
 
 public interface StaffService {
-    // æ·»åŠ æ–°å‘˜å·¥
+    // Ìí¼ÓĞÂÔ±¹¤
     Staff addStaff(Staff staff);
-    
-    // è·å–ç‰¹å®šå‘˜å·¥
+
+    // »ñÈ¡ÌØ¶¨Ô±¹¤
     Staff getStaffById(Long id);
-    
-    // è·å–æ‰€æœ‰å‘˜å·¥
+
+    // »ñÈ¡ËùÓĞÔ±¹¤
     List<Staff> getAllStaff();
-    
-    // æ ¹æ®å‘˜å·¥ç¼–å·è·å–å‘˜å·¥
+
+    // ¸ù¾İÔ±¹¤±àºÅ»ñÈ¡Ô±¹¤
     Staff getStaffByNumber(String staffNumber);
-    
-    // æ›´æ–°å‘˜å·¥ä¿¡æ¯
+
+    // ¸üĞÂÔ±¹¤ĞÅÏ¢
     Staff updateStaff(Long id, Staff staffDetails);
-    
-    // åˆ é™¤å‘˜å·¥
+
+    // É¾³ıÔ±¹¤
     void deleteStaff(Long id);
-    
-    // è·å–ç‰¹å®šçŠ¶æ€çš„å‘˜å·¥
+
+    // »ñÈ¡ÌØ¶¨×´Ì¬µÄÔ±¹¤
     List<Staff> getStaffByStatus(String status);
-    
-    // è·å–ç‰¹å®šåŒºåŸŸçš„å‘˜å·¥
+
+    // »ñÈ¡ÌØ¶¨ÇøÓòµÄÔ±¹¤
     List<Staff> getStaffByArea(String area);
-    
-    // è·å–ç‰¹å®šèŒä½çš„å‘˜å·¥
+
+    // »ñÈ¡ÌØ¶¨Ö°Î»µÄÔ±¹¤
     List<Staff> getStaffByPosition(String position);
-    
-    // æ›´æ–°å‘˜å·¥çŠ¶æ€
+
+    // ¸üĞÂÔ±¹¤×´Ì¬
     Staff updateStaffStatus(Long id, String status);
-    
-    // æ›´æ–°å‘˜å·¥åŒºåŸŸ
+
+    // ¸üĞÂÔ±¹¤ÇøÓò
     Staff updateStaffArea(Long id, String area);
-} 
+
+    // ÑéÖ¤Ô±¹¤µÇÂ¼
+    Map<String, Object> authenticateStaff(String staffNumber, String password);
+}

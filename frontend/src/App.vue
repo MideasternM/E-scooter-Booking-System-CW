@@ -10,6 +10,7 @@ import { RouterLink, RouterView } from 'vue-router'
         <div class="nav-links">
           <RouterLink to="/scooters">Scooters</RouterLink>
           <RouterLink to="/bookings">Bookings</RouterLink>
+          <RouterLink to="/admin/login" class="admin-link">Admin</RouterLink>
         </div>
       </nav>
     </header>
@@ -67,6 +68,12 @@ nav a.router-link-active {
   background-color: rgba(255, 255, 255, 0.2);
 }
 
+.admin-link {
+  background-color: rgba(0, 0, 0, 0.2);
+  margin-left: 1rem;
+  font-weight: 500;
+}
+
 main {
   flex: 1;
   padding: 1rem;
@@ -107,5 +114,4 @@ main {
     justify-content: center;
   }
 }
-
 </style>

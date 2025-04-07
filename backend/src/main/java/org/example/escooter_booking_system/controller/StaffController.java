@@ -1,10 +1,14 @@
 package org.example.escooter_booking_system.controller;
 
 import org.example.escooter_booking_system.model.Staff;
+import org.example.escooter_booking_system.model.StaffLoginRequest;
+import org.example.escooter_booking_system.model.StaffRegistrationRequest;
 import org.example.escooter_booking_system.service.StaffService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 import java.util.List;
 
@@ -101,4 +105,45 @@ public class StaffController {
         }
         return ResponseEntity.notFound().build();
     }
-} 
+
+    @PostMapping("/login")
+    public ResponseEntity<?> loginStaff(@RequestBody StaffLoginRequest loginRequest) {
+        Map<String, Object> result = staffService.authenticateStaff(
+                loginRequest.getStaffNumber(),
+                loginRequest.getPassword());
+
+        if (result != null) {
+            return ResponseEntity.ok(result);
+        }
+
+        return ResponseEntity.status(401).body(Map.of("message", "Invalid staff number or password"));
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> registerStaff(@RequestBody StaffRegistrationRequest registrationRequest) {
+        // Check if staff with the same number already exists
+        Staff existingStaff = staffService.getStaffByNumber(registrationRequest.getStaffNumber());
+        if (existingStaff != null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Staff with this number already exists"));
+        }
+
+        // Create new staff object from registration request
+        Staff newStaff = new Staff();
+        newStaff.setStaffNumber(registrationRequest.getStaffNumber());
+        newStaff.setName(registrationRequest.getName());
+        newStaff.setPosition(registrationRequest.getPosition());
+        newStaff.setPhoneNumber(registrationRequest.getPhoneNumber());
+        newStaff.setEmail(registrationRequest.getEmail());
+        newStaff.setPassword(registrationRequest.getPassword());
+        newStaff.setArea(registrationRequest.getArea());
+
+        // Set default status if not provided
+        String status = registrationRequest.getStatus();
+        newStaff.setStatus(status != null ? status : "Active");
+
+        // Save the new staff
+        Staff registeredStaff = staffService.addStaff(newStaff);
+
+        return ResponseEntity.ok(registeredStaff);
+    }
+}

@@ -1,49 +1,14 @@
 package org.example.escooter_booking_system.model;
 
-import jakarta.persistence.*;
-import java.util.Date;
-
-@Entity
-public class Staff {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false)
+public class StaffRegistrationRequest {
     private String staffNumber;
-
-    @Column(nullable = false)
     private String name;
-
-    @Column(nullable = false)
     private String position;
-
-    @Column(nullable = false)
     private String phoneNumber;
-
-    @Column(nullable = false)
     private String email;
-
-    @Column(nullable = false)
-    private String status;
-
-    @Column
-    private String area;
-
-    @Column(nullable = false)
     private String password;
-
-    @Column(nullable = false)
-    private Date createdAt = new Date();
-
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
+    private String area;
+    private String status;
 
     public String getStaffNumber() {
         return staffNumber;
@@ -85,12 +50,12 @@ public class Staff {
         this.email = email;
     }
 
-    public String getStatus() {
-        return status;
+    public String getPassword() {
+        return password;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     public String getArea() {
@@ -101,19 +66,11 @@ public class Staff {
         this.area = area;
     }
 
-    public String getPassword() {
-        return password;
+    public String getStatus() {
+        return status;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public Date getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
+    public void setStatus(String status) {
+        this.status = status;
     }
 }
