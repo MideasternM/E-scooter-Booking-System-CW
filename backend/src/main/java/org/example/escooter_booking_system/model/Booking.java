@@ -1,10 +1,12 @@
 package org.example.escooter_booking_system.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.util.Date;
 import java.util.List;
 
 @Entity
+@JsonIgnoreProperties({ "faultReports" })
 public class Booking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,6 +40,10 @@ public class Booking {
 
     @Column(nullable = false)
     private Date createdAt = new Date();
+
+    // Add field for selected duration label
+    @Column // Making it nullable by default
+    private String selectedDurationLabel;
 
     // Getters and Setters
     public Long getId() {
@@ -110,5 +116,14 @@ public class Booking {
 
     public void setPayment(Payment payment) {
         this.payment = payment;
+    }
+
+    // Add getter/setter for the new field
+    public String getSelectedDurationLabel() {
+        return selectedDurationLabel;
+    }
+
+    public void setSelectedDurationLabel(String selectedDurationLabel) {
+        this.selectedDurationLabel = selectedDurationLabel;
     }
 }

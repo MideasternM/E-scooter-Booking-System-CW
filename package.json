@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "decimal.js": "^10.5.0",
+    "jwt-decode": "^4.0.0",
+    "leaflet": "^1.9.4"
+  }
+}

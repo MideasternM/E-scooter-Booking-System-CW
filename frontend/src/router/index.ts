@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import AdminPricingView from '../views/AdminPricingView.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -28,12 +29,13 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('../views/BookingListView.vue')
   },
   {
-    path: '/booking/:id',
-    name: 'booking-detail',
-    component: () => import('../views/BookingDetailView.vue')
+    path: '/booking/create/:scooterId',
+    name: 'booking-create',
+    component: () => import('../views/BookingCreateView.vue'),
+    props: true
   },
   {
-    path: '/report-issue/:id',
+    path: '/report-issue/:scooterId',
     name: 'report-issue',
     component: () => import('../views/ReportIssueView.vue')
   },
@@ -41,6 +43,12 @@ const routes: Array<RouteRecordRaw> = [
     path: '/receipt/:id',
     name: 'receipt',
     component: () => import('../views/ReceiptView.vue')
+  },
+  {
+    path: '/payment/:bookingId',
+    name: 'payment',
+    component: () => import('../views/PaymentView.vue'),
+    props: true
   },
   // Admin routes
   {
@@ -86,6 +94,18 @@ const routes: Array<RouteRecordRaw> = [
         name: 'admin-issues',
         component: () => import('../views/AdminIssuesView.vue'),
         meta: { requiresAdmin: true }
+      },
+      {
+        path: 'pricing',
+        name: 'admin-pricing',
+        component: AdminPricingView,
+        meta: { requiresAdmin: true }
+      },
+      {
+        path: 'revenue',
+        name: 'admin-revenue',
+        component: () => import('../views/AdminRevenueView.vue'),
+        meta: { requiresAdmin: true }
       }
     ]
   }
@@ -96,20 +116,14 @@ const router = createRouter({
   routes
 })
 
-// ???????????????????????????????????
 router.beforeEach((to, from, next) => {
-  // ?????????????????????
   if (to.matched.some(record => record.meta.requiresAdmin)) {
-    // ?????????????????
     if (!localStorage.getItem('adminToken')) {
-      // ???????????????????????????????
       next({ name: 'admin-login' })
     } else {
-      // ???????????????????????
       next()
     }
   } else {
-    // ?????????????????????????????????
     next()
   }
 })

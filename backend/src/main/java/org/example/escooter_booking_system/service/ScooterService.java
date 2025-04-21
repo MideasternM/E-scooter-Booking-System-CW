@@ -14,5 +14,7 @@ public interface ScooterService {
 
     Scooter updateScooter(Long id, Scooter scooterDetails);
 
+    Scooter updateScooterStatus(Long id, String status);
+
     void deleteScooter(Long id);
 }

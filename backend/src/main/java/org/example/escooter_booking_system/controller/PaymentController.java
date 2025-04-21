@@ -45,4 +45,10 @@ public class PaymentController {
         }
         return ResponseEntity.notFound().build();
     }
+
+    @PostMapping("/booking/{bookingId}")
+    public ResponseEntity<Payment> createPayment(@PathVariable Long bookingId) {
+        Payment createdPayment = paymentService.createPaymentForBooking(bookingId);
+        return ResponseEntity.ok(createdPayment);
+    }
 }

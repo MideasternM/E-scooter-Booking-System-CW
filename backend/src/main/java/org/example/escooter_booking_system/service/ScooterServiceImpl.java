@@ -41,6 +41,17 @@ public class ScooterServiceImpl implements ScooterService {
             scooter.setBatteryLevel(scooterDetails.getBatteryLevel());
             scooter.setLocation(scooterDetails.getLocation());
             scooter.setAvailable(scooterDetails.getAvailable());
+            scooter.setLastMaintenanceDate(scooterDetails.getLastMaintenanceDate());
+            return scooterRepository.save(scooter);
+        }
+        return null;
+    }
+
+    @Override
+    public Scooter updateScooterStatus(Long id, String status) {
+        Scooter scooter = scooterRepository.findById(id).orElse(null);
+        if (scooter != null) {
+            scooter.setAvailable("Available".equalsIgnoreCase(status));
             return scooterRepository.save(scooter);
         }
         return null;

@@ -1,5 +1,6 @@
 package org.example.escooter_booking_system.controller;
 
+import org.example.escooter_booking_system.dto.FaultReportDTO;
 import org.example.escooter_booking_system.model.FaultReport;
 import org.example.escooter_booking_system.service.FaultReportService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,17 +8,24 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/fault-reports")
+@RequestMapping("/api/issues")
 public class FaultReportController {
 
     @Autowired
     private FaultReportService faultReportService;
 
+    @GetMapping
+    public ResponseEntity<List<FaultReport>> getAllFaultReports() {
+        List<FaultReport> reports = faultReportService.getAllFaultReports();
+        return ResponseEntity.ok(reports);
+    }
+
     @PostMapping
-    public ResponseEntity<FaultReport> createFaultReport(@RequestBody FaultReport faultReport) {
-        FaultReport createdReport = faultReportService.createFaultReport(faultReport);
+    public ResponseEntity<FaultReport> createFaultReport(@RequestBody FaultReportDTO faultReportDTO) {
+        FaultReport createdReport = faultReportService.createFaultReport(faultReportDTO);
         return ResponseEntity.ok(createdReport);
     }
 
@@ -79,8 +87,10 @@ public class FaultReportController {
     @PutMapping("/{id}/status")
     public ResponseEntity<FaultReport> updateStatus(
             @PathVariable Long id,
-            @RequestParam String status) {
-        FaultReport updatedReport = faultReportService.updateStatus(id, status);
+            @RequestBody Map<String, String> payload) {
+        String status = payload.get("status");
+        String notes = payload.get("notes");
+        FaultReport updatedReport = faultReportService.updateStatus(id, status, notes);
         if (updatedReport != null) {
             return ResponseEntity.ok(updatedReport);
         }
@@ -115,4 +125,4 @@ public class FaultReportController {
         List<FaultReport> reports = faultReportService.getFaultReportsBySeverity(severity);
         return ResponseEntity.ok(reports);
     }
-} 
+}

@@ -1,9 +1,13 @@
 package org.example.escooter_booking_system.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.util.Date;
 
 @Entity
+// Ignore potentially looping fields in related entities
+@JsonIgnoreProperties({ "faultReports", "payment", "user.bookings", "user.faultReports", "scooter.bookings",
+        "assignedStaff.faultReports" })
 public class FaultReport {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -208,4 +212,4 @@ public class FaultReport {
     public void setReplacementParts(String replacementParts) {
         this.replacementParts = replacementParts;
     }
-} 
+}

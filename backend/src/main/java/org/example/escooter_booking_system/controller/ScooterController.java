@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/scooters")
@@ -46,6 +47,17 @@ public class ScooterController {
     public ResponseEntity<Scooter> updateScooter(@PathVariable Long id,
             @RequestBody Scooter scooterDetails) {
         Scooter updatedScooter = scooterService.updateScooter(id, scooterDetails);
+        if (updatedScooter != null) {
+            return ResponseEntity.ok(updatedScooter);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @PutMapping("/{id}/status")
+    public ResponseEntity<Scooter> updateScooterStatus(@PathVariable Long id,
+            @RequestBody Map<String, String> payload) {
+        String status = payload.get("status");
+        Scooter updatedScooter = scooterService.updateScooterStatus(id, status);
         if (updatedScooter != null) {
             return ResponseEntity.ok(updatedScooter);
         }

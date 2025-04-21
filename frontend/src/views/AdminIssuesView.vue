@@ -21,7 +21,12 @@
             </select>
         </div>
 
-        <div class="table-container">
+        <!-- Add Loading/Error/Empty States -->
+        <div v-if="isLoading" class="loading-message">Loading issues...</div>
+        <div v-else-if="apiError" class="error-message">{{ apiError }}</div>
+        <div v-else-if="issues.length === 0" class="empty-message">No issues found.</div>
+
+        <div v-else class="table-container">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -35,27 +40,30 @@
                     </tr>
                 </thead>
                 <tbody>
+                    <!-- Iterate over processed issues -->
                     <tr v-for="issue in filteredIssues" :key="issue.id">
                         <td>#{{ issue.id }}</td>
-                        <td>Scooter #{{ issue.scooterId }}</td>
-                        <td>{{ issue.reportedBy }}</td>
+                        <td>Scooter #{{ issue.scooterId || 'N/A' }}</td>
+                        <td>{{ issue.reportedByName || 'N/A' }}</td>
                         <td>{{ issue.issueType }}</td>
                         <td>{{ formatDate(issue.reportDate) }}</td>
                         <td>
-                            <span class="status-badge" :class="issue.status.toLowerCase().replace(' ', '-')">
-                                {{ issue.status }}
+                            <!-- Safe status access -->
+                            <span class="status-badge" :class="(issue.status || '').toLowerCase().replace(' ', '-')">
+                                {{ issue.status || 'Unknown' }}
                             </span>
                         </td>
                         <td class="actions-cell">
                             <button class="action-btn view" @click="viewIssueDetails(issue.id)">
                                 View
                             </button>
+                             <!-- Pass ProcessedIssue object -->
                             <button v-if="issue.status === 'Pending'" class="action-btn progress"
-                                @click="updateIssueStatus(issue.id, 'In Progress')">
+                                @click="updateIssueStatus(issue, 'In Progress')">
                                 Start Progress
                             </button>
                             <button v-if="issue.status === 'In Progress'" class="action-btn resolve"
-                                @click="updateIssueStatus(issue.id, 'Resolved')">
+                                @click="updateIssueStatus(issue, 'Resolved')">
                                 Mark Resolved
                             </button>
                         </td>
@@ -65,25 +73,26 @@
         </div>
 
         <!-- View Issue Details Modal -->
-        <div v-if="showDetailsModal" class="modal-overlay">
-            <div class="modal-container">
+        <div v-if="showDetailsModal && selectedIssue" class="modal-overlay" @click="closeIssueDetailsModal">
+            <div class="modal-container" @click.stop @mousedown.stop @mouseup.stop @touchstart.stop @touchend.stop>
                 <div class="modal-header">
                     <h3>Issue Details #{{ selectedIssue.id }}</h3>
-                    <button class="close-btn" @click="showDetailsModal = false">&times;</button>
+                    <button class="close-btn" @click="closeIssueDetailsModal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="issue-details">
+                     <!-- Add v-if check -->
+                    <div v-if="selectedIssue" class="issue-details">
                         <div class="detail-section">
                             <h4>Scooter Information</h4>
-                            <p><strong>Scooter ID:</strong> #{{ selectedIssue.scooterId }}</p>
-                            <p><strong>Location:</strong> {{ selectedIssue.location }}</p>
+                            <p><strong>Scooter ID:</strong> #{{ selectedIssue.scooterId || 'N/A' }}</p>
+                            <p><strong>Location:</strong> {{ selectedIssue.location || 'N/A' }}</p>
                         </div>
 
                         <div class="detail-section">
                             <h4>Reporter Information</h4>
-                            <p><strong>Reported By:</strong> {{ selectedIssue.reportedBy }}</p>
-                            <p><strong>User ID:</strong> {{ selectedIssue.userId }}</p>
-                            <p><strong>Contact:</strong> {{ selectedIssue.contactInfo || 'Not provided' }}</p>
+                            <p><strong>Reported By:</strong> {{ selectedIssue.reportedByName || 'N/A' }}</p>
+                            <p><strong>User ID:</strong> #{{ selectedIssue.userId || 'N/A'}}</p>
+                            <!-- <p><strong>Contact:</strong> {{ selectedIssue.contactInfo || 'Not provided' }}</p> -->
                         </div>
 
                         <div class="detail-section">
@@ -92,8 +101,8 @@
                             <p><strong>Report Date:</strong> {{ formatDateTime(selectedIssue.reportDate) }}</p>
                             <p><strong>Status:</strong>
                                 <span class="status-badge"
-                                    :class="selectedIssue.status.toLowerCase().replace(' ', '-')">
-                                    {{ selectedIssue.status }}
+                                    :class="(selectedIssue.status || '').toLowerCase().replace(' ', '-')">
+                                    {{ selectedIssue.status || 'Unknown' }}
                                 </span>
                             </p>
                         </div>
@@ -103,14 +112,15 @@
                             <p class="issue-description">{{ selectedIssue.description }}</p>
                         </div>
 
-                        <div v-if="selectedIssue.photos && selectedIssue.photos.length > 0" class="detail-section">
-                            <h4>Photos</h4>
-                            <div class="photo-gallery">
-                                <div v-for="(photo, index) in selectedIssue.photos" :key="index" class="photo-item">
-                                    <img :src="photo" :alt="`Issue photo ${index + 1}`" />
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Photos - Assuming photos are URLs from backend -->
+                         <div v-if="selectedIssue.photos && selectedIssue.photos.length > 0" class="detail-section">
+                             <h4>Photos</h4>
+                             <div class="photo-gallery">
+                                 <div v-for="(photoUrl, index) in selectedIssue.photos" :key="index" class="photo-item">
+                                     <img :src="photoUrl" :alt="`Issue photo ${index + 1}`" />
+                                 </div>
+                             </div>
+                         </div>
 
                         <div class="detail-section">
                             <h4>Resolution Notes</h4>
@@ -119,6 +129,7 @@
                         </div>
 
                         <div class="form-actions" v-if="selectedIssue.status !== 'Resolved'">
+                             <!-- Pass ProcessedIssue object -->
                             <button v-if="selectedIssue.status === 'Pending'" class="action-btn progress"
                                 @click="updateIssueWithNotes('In Progress')">
                                 Start Progress
@@ -136,238 +147,243 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import { ref, computed, onMounted, watch } from 'vue' // Import watch
+import { adminApi } from '../services/api'
+import { parseISO, format as formatDateFn } from 'date-fns'; // Import date-fns
 
-interface Issue {
-    id: number
-    scooterId: number
-    userId: number
-    reportedBy: string
-    contactInfo?: string
-    issueType: string
-    description: string
-    location: string
-    reportDate: Date
-    status: string
-    photos?: string[]
-    resolutionNotes?: string
+// Interface for API Response (based on FaultReport entity)
+interface ApiIssueResponse {
+    id: number;
+    scooter?: { id: number; location?: string; }; // Nested scooter
+    reportedBy?: { id: number; username?: string; name?: string; }; // Nested user
+    faultType?: string; // Changed from issueType based on FaultReport entity
+    description?: string;
+    location?: string; // Location where issue occurred
+    reportedAt?: string | null; // Changed from reportDate
+    status?: string | null;
+    resolution?: string | null; // Resolution notes from backend
+    staffNotes?: string | null; // Staff notes from backend
+    photos?: string[] | null; // Assuming backend provides photo URLs
+    // Add other potentially relevant fields from FaultReport
+    severity?: string;
+    assignedStaff?: { id: number; username?: string; };
+}
+
+// Interface for internal component data
+interface ProcessedIssue {
+    id: number;
+    scooterId?: number;
+    userId?: number;
+    reportedByName?: string;
+    issueType: string;
+    description: string;
+    location?: string; // Location from scooter or report?
+    reportDate: Date | null; // Store as Date object
+    status: string; // Ensure always string
+    photos?: string[] | null;
+    resolutionNotes?: string | null;
+    // Keep raw data if needed
+    rawIssueData?: ApiIssueResponse;
 }
 
 // State variables
-const issues = ref<Issue[]>([])
+const issues = ref<ProcessedIssue[]>([]) // Store processed issues
+const isLoading = ref(true);
+const apiError = ref<string | null>(null);
 const searchQuery = ref('')
 const filterStatus = ref('all')
 const sortBy = ref('date')
 
 // Modal state
 const showDetailsModal = ref(false)
-const selectedIssue = ref<Issue>({
-    id: 0,
-    scooterId: 0,
-    userId: 0,
-    reportedBy: '',
-    issueType: '',
-    description: '',
-    location: '',
-    reportDate: new Date(),
-    status: ''
-})
+const selectedIssue = ref<ProcessedIssue | null>(null) // Use ProcessedIssue | null
 const resolutionNotes = ref('')
 
-// Mock data
-const mockIssues: Issue[] = [
-    {
-        id: 501,
-        scooterId: 5010,
-        userId: 103,
-        reportedBy: 'Michael Brown',
-        contactInfo: 'michael.brown@example.com',
-        issueType: 'Battery',
-        description: 'Scooter battery drains very quickly, only lasted about 10 minutes on a full charge.',
-        location: 'Main Street',
-        reportDate: new Date(Date.now() - 86400000),
-        status: 'Pending',
-        photos: ['/images/issue-1.jpg']
-    },
-    {
-        id: 500,
-        scooterId: 5015,
-        userId: 105,
-        reportedBy: 'Lisa Taylor',
-        contactInfo: 'lisa.taylor@example.com',
-        issueType: 'Brakes',
-        description: 'Brakes are not responding well, takes too long to stop.',
-        location: 'Central Park',
-        reportDate: new Date(Date.now() - 172800000),
-        status: 'In Progress',
-        photos: ['/images/issue-2.jpg', '/images/issue-3.jpg'],
-        resolutionNotes: 'Technician assigned to check brake system.'
-    },
-    {
-        id: 499,
-        scooterId: 5003,
-        userId: 102,
-        reportedBy: 'James Anderson',
-        contactInfo: 'james.anderson@example.com',
-        issueType: 'Wheels',
-        description: 'Front wheel wobbles while riding, feels unsafe.',
-        location: 'City Square',
-        reportDate: new Date(Date.now() - 259200000),
-        status: 'Resolved',
-        resolutionNotes: 'Front wheel axle tightened and aligned. Test ride confirmed issue is fixed.'
-    },
-    {
-        id: 498,
-        scooterId: 5022,
-        userId: 107,
-        reportedBy: 'Emily White',
-        contactInfo: 'emily.white@example.com',
-        issueType: 'Lights',
-        description: 'Headlight not working at night, difficult to see the road.',
-        location: 'University Campus',
-        reportDate: new Date(Date.now() - 345600000),
-        status: 'Resolved',
-        resolutionNotes: 'Replaced headlight bulb and checked wiring. All lights functioning properly now.'
-    },
-    {
-        id: 497,
-        scooterId: 5008,
-        userId: 110,
-        reportedBy: 'Daniel Lee',
-        contactInfo: 'daniel.lee@example.com',
-        issueType: 'Throttle',
-        description: 'Throttle sticks occasionally, causing unexpected acceleration.',
-        location: 'Downtown',
-        reportDate: new Date(Date.now() - 432000000),
-        status: 'Pending'
+// Watch selectedIssue to update resolutionNotes
+watch(selectedIssue, (newVal) => {
+    if (newVal) {
+        // Prefer staffNotes from backend if available, otherwise resolution
+        resolutionNotes.value = newVal.rawIssueData?.staffNotes || newVal.rawIssueData?.resolution || '';
+    } else {
+        resolutionNotes.value = '';
     }
-]
+});
 
 // Computed properties
 const filteredIssues = computed(() => {
-    let result = [...issues.value]
+    let result = [...issues.value];
 
-    // Apply search filter
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase()
         result = result.filter(issue =>
             issue.id.toString().includes(query) ||
-            issue.scooterId.toString().includes(query) ||
+            issue.scooterId?.toString().includes(query) ||
             issue.issueType.toLowerCase().includes(query) ||
-            issue.reportedBy.toLowerCase().includes(query)
-        )
+            (issue.reportedByName || '').toLowerCase().includes(query)
+        );
     }
 
-    // Apply status filter
     if (filterStatus.value !== 'all') {
-        const statusMap: Record<string, string> = {
-            'pending': 'Pending',
-            'in-progress': 'In Progress',
-            'resolved': 'Resolved'
-        }
-        result = result.filter(issue =>
-            issue.status === statusMap[filterStatus.value]
-        )
+        // Map filter values if needed (e.g., pending -> Pending)
+        const targetStatus = filterStatus.value.replace('-', ' '); // Convert in-progress to In Progress
+         result = result.filter(issue =>
+             (issue.status || '').toLowerCase() === targetStatus.toLowerCase()
+         );
     }
 
-    // Apply sorting
     result.sort((a, b) => {
         if (sortBy.value === 'date') {
-            return new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime()
+            return (b.reportDate?.getTime() ?? 0) - (a.reportDate?.getTime() ?? 0);
         } else if (sortBy.value === 'scooter') {
-            return a.scooterId - b.scooterId
+            return (a.scooterId ?? 0) - (b.scooterId ?? 0);
         } else if (sortBy.value === 'type') {
-            return a.issueType.localeCompare(b.issueType)
+            return a.issueType.localeCompare(b.issueType);
         }
-        return 0
-    })
+        return 0;
+    });
 
-    return result
-})
+    return result;
+});
 
-// Methods
-const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-    }).format(date)
-}
-
-const formatDateTime = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    }).format(date)
-}
-
-const viewIssueDetails = (id: number) => {
-    const issue = issues.value.find(i => i.id === id)
-    if (issue) {
-        selectedIssue.value = { ...issue }
-        resolutionNotes.value = issue.resolutionNotes || ''
-        showDetailsModal.value = true
-    }
-}
-
-const updateIssueStatus = async (id: number, newStatus: string) => {
+// --- API Interaction --- 
+const fetchIssues = async () => {
+    isLoading.value = true;
+    apiError.value = null;
     try {
-        // In a real app, you would call the API
-        // await axios.put(`/api/issues/${id}/status`, { status: newStatus })
+        const response = await adminApi.getAllIssues();
+        issues.value = response.data.map((raw: ApiIssueResponse): ProcessedIssue => {
+            let parsedDate: Date | null = null;
+            try { parsedDate = raw.reportedAt ? parseISO(raw.reportedAt) : null; } catch (e) { console.error("Error parsing reportedAt:", raw.reportedAt, e); }
 
-        // For now, update the local state
-        const index = issues.value.findIndex(i => i.id === id)
+            return {
+                id: raw.id,
+                scooterId: raw.scooter?.id,
+                userId: raw.reportedBy?.id,
+                reportedByName: raw.reportedBy?.username || raw.reportedBy?.name || 'Unknown User',
+                issueType: raw.faultType || 'Unknown Type', // Map faultType to issueType
+                description: raw.description || 'No description',
+                location: raw.location || raw.scooter?.location || 'Unknown Location',
+                reportDate: parsedDate,
+                status: raw.status || 'Unknown',
+                photos: raw.photos,
+                resolutionNotes: raw.resolution || raw.staffNotes,
+                rawIssueData: raw
+            };
+        });
+    } catch (error: any) {
+        console.error('Failed to fetch issues:', error);
+        apiError.value = `Failed to load issues: ${error.message || 'Unknown error'}`;
+        issues.value = [];
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+const updateIssueStatus = async (issue: ProcessedIssue, newStatus: string, notes?: string) => {
+    try {
+        await adminApi.updateIssueStatus(issue.id, newStatus, notes);
+        // Update local state
+        const index = issues.value.findIndex(i => i.id === issue.id);
         if (index !== -1) {
-            issues.value[index].status = newStatus
-            if (newStatus === 'In Progress' && !issues.value[index].resolutionNotes) {
-                issues.value[index].resolutionNotes = 'Issue being investigated.'
+            issues.value[index].status = newStatus;
+            // Optionally update notes if provided
+            if(notes) issues.value[index].resolutionNotes = notes;
+            if (issues.value[index].rawIssueData) {
+                 issues.value[index].rawIssueData!.status = newStatus;
+                 if(notes) issues.value[index].rawIssueData!.staffNotes = notes; // Assuming notes map to staffNotes
             }
         }
-    } catch (error) {
-        console.error('Failed to update issue status:', error)
-    }
-}
-
-const updateIssueWithNotes = async (newStatus: string) => {
-    try {
-        // In a real app, you would call the API
-        // await axios.put(`/api/issues/${selectedIssue.value.id}`, { 
-        //   status: newStatus,
-        //   resolutionNotes: resolutionNotes.value 
-        // })
-
-        // For now, update the local state
-        const index = issues.value.findIndex(i => i.id === selectedIssue.value.id)
-        if (index !== -1) {
-            issues.value[index].status = newStatus
-            issues.value[index].resolutionNotes = resolutionNotes.value
+        // Also update selected issue if it's the one being modified
+        if (selectedIssue.value && selectedIssue.value.id === issue.id) {
+             selectedIssue.value.status = newStatus;
+             if(notes) selectedIssue.value.resolutionNotes = notes;
+             if (selectedIssue.value.rawIssueData) {
+                  selectedIssue.value.rawIssueData.status = newStatus;
+                  if(notes) selectedIssue.value.rawIssueData.staffNotes = notes;
+             }
         }
-
-        showDetailsModal.value = false
-    } catch (error) {
-        console.error('Failed to update issue:', error)
+        alert(`Issue #${issue.id} status updated to ${newStatus}.`);
+    } catch (error: any) {
+        console.error(`Failed to update issue ${issue.id} status:`, error);
+        alert(`Failed to update status: ${error.response?.data?.message || error.message}`);
     }
-}
+};
 
-onMounted(async () => {
+// Called from modal when updating with notes
+const updateIssueWithNotes = async (newStatus: string) => {
+    if (!selectedIssue.value) return;
+    await updateIssueStatus(selectedIssue.value, newStatus, resolutionNotes.value);
+    closeIssueDetailsModal();
+};
+
+// --- Modal Control --- 
+const viewIssueDetails = (issueId: number) => {
     try {
-        // In a real app, you would fetch the issues from the API
-        // const response = await axios.get('/api/admin/issues')
-        // issues.value = response.data
-
-        // For now, use mock data
-        issues.value = mockIssues
+        const issue = issues.value.find(i => i.id === issueId);
+        if (issue) {
+            // 创建副本以避免引用问题
+            selectedIssue.value = JSON.parse(JSON.stringify(issue));
+            
+            // 阻止页面滚动
+            document.body.classList.add('modal-open');
+            showDetailsModal.value = true;
+        } else {
+            console.warn(`在当前列表中未找到问题 ${issueId} 的详细信息。`);
+            alert('无法找到问题详情。');
+        }
     } catch (error) {
-        console.error('Failed to load issues:', error)
+        console.error('查看问题详情时出错:', error);
+        alert('无法显示问题详情。');
     }
-})
+};
+
+// 添加关闭模态框的函数
+const closeIssueDetailsModal = () => {
+    showDetailsModal.value = false;
+    document.body.classList.remove('modal-open');
+};
+
+// --- Formatting --- 
+const formatDate = (dateObj: Date | null | undefined) => {
+    if (!dateObj || !(dateObj instanceof Date) || isNaN(dateObj.getTime())) return 'N/A';
+    try {
+        return formatDateFn(dateObj, 'MMM d, yyyy');
+    } catch (error) { return 'Error'; }
+};
+
+const formatDateTime = (dateObj: Date | null | undefined) => {
+    if (!dateObj || !(dateObj instanceof Date) || isNaN(dateObj.getTime())) return 'N/A';
+    try {
+        return formatDateFn(dateObj, 'MMM d, yyyy, hh:mm a');
+    } catch (error) { return 'Error'; }
+};
+
+// Lifecycle hook
+onMounted(() => {
+    fetchIssues();
+});
+
 </script>
 
 <style scoped>
+/* Add styles for loading/error/empty messages */
+.loading-message,
+.error-message,
+.empty-message {
+    padding: 2rem;
+    text-align: center;
+    color: #606f7b;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+.error-message {
+    color: #e74c3c;
+    background-color: #fceded;
+    border: 1px solid #e74c3c;
+}
+
+/* General Styles */
 .admin-issues {
     padding: 1rem;
 }
@@ -437,6 +453,7 @@ h1 {
     font-size: 0.875rem;
     font-weight: 500;
     color: white;
+    text-transform: capitalize;
 }
 
 .status-badge.pending {
@@ -444,11 +461,18 @@ h1 {
 }
 
 .status-badge.in-progress {
-    background-color: #3498db;
+    background-color: #9b59b6;
 }
 
 .status-badge.resolved {
-    background-color: #42b983;
+    background-color: #3498db;
+}
+/* Add style for 'New' status if it exists */
+.status-badge.new {
+    background-color: #e67e22; /* Example: Orange color */
+}
+.status-badge.unknown {
+     background-color: #95a5a6;
 }
 
 .actions-cell {
@@ -471,12 +495,12 @@ h1 {
 }
 
 .action-btn.progress {
-    background-color: #f39c12;
+    background-color: #2ecc71;
     color: white;
 }
 
 .action-btn.resolve {
-    background-color: #42b983;
+    background-color: #1abc9c;
     color: white;
 }
 
@@ -484,28 +508,36 @@ h1 {
     opacity: 0.9;
 }
 
-/* Modal Styles */
+/* Modal Styles (Copied from AdminDashboardView) */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.7);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 9999; /* Keep high z-index */
+    visibility: visible;
+    opacity: 1;
 }
 
 .modal-container {
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
     width: 90%;
-    max-width: 600px;
+    max-width: 700px;
     max-height: 90vh;
-    overflow-y: auto;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 10000; /* Higher than overlay */
+    visibility: visible;
+    opacity: 1;
+    /* overflow: hidden; */ /* Let modal-body handle scroll */
 }
 
 .modal-header {
@@ -513,95 +545,85 @@ h1 {
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1.5rem;
-    border-bottom: 1px solid #eee;
-}
-
-.modal-header h3 {
-    margin: 0;
+    border-bottom: 1px solid #f1f1f1;
     color: #2c3e50;
+    flex-shrink: 0;
 }
-
+.modal-header h3 { margin: 0; font-weight: 600; }
 .close-btn {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: #606f7b;
+    background: none; border: none; font-size: 1.5rem; cursor: pointer;
+    color: #606f7b; padding: 0; line-height: 1; transition: color 0.2s;
 }
+.close-btn:hover { color: #ef4444; }
 
 .modal-body {
-    padding: 1.5rem;
+    padding: 1.25rem;
+    color: #2c3e50;
+    overflow-y: auto; /* Enable vertical scroll within body */
+    flex-grow: 1;
 }
 
+/* Specific details styling */
 .issue-details {
     display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1.5rem;
 }
 
 .detail-section h4 {
-    margin: 0 0 0.5rem;
-    color: #42b983;
+    margin: 0 0 0.75rem;
+    color: #10b981; /* Example color */
     font-size: 1.1rem;
+    font-weight: 600;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
 }
 
 .detail-section p {
-    margin: 0.25rem 0;
-    color: #2c3e50;
+    margin: 0.4rem 0;
+    line-height: 1.6;
 }
 
 .issue-description {
+    white-space: pre-wrap; /* Preserve whitespace */
     background-color: #f8f9fa;
-    padding: 1rem;
-    border-radius: 4px;
-    white-space: pre-line;
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid #eee;
 }
 
 .photo-gallery {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
 }
 
 .photo-item img {
-    width: 100%;
-    height: 100px;
+    max-width: 150px;
+    max-height: 150px;
+    border-radius: 6px;
     object-fit: cover;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: transform 0.3s;
-}
-
-.photo-item img:hover {
-    transform: scale(1.05);
-}
-
-textarea {
-    width: 100%;
-    padding: 0.8rem;
     border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
-    resize: vertical;
+}
+
+.detail-section textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
     font-family: inherit;
-}
-
-textarea:focus {
-    border-color: #42b983;
-    outline: none;
-}
-
-textarea:disabled {
-    background-color: #f8f9fa;
-    cursor: not-allowed;
+    font-size: 0.95rem;
 }
 
 .form-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
 }
+/* --- End Modal Styles --- */
 
 @media (max-width: 768px) {
     .filters {
@@ -627,14 +649,6 @@ textarea:disabled {
 
     .action-btn {
         width: 100%;
-    }
-
-    .photo-gallery {
-        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    }
-
-    .photo-item img {
-        height: 80px;
     }
 }
 </style>

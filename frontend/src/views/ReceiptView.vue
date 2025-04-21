@@ -1,8 +1,8 @@
 <template>
   <div class="receipt-container">
     <div class="header">
-      <router-link :to="`/booking/${bookingId}`" class="back-button">
-        <span>&larr;</span> Back to Booking Details
+      <router-link to="/bookings" class="back-button">
+        <span>&larr;</span> Back to Booking List
       </router-link>
       <h1>Receipt</h1>
       <p class="subtitle">Booking #{{ bookingId }}</p>
@@ -96,13 +96,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { bookingApi, api } from '../services/api'
 
 const route = useRoute()
 const router = useRouter()
-const bookingId = route.params.id
+const bookingId = Number(route.params.id)
 const loading = ref(true)
 const error = ref('')
-const receiptId = 'R' + Math.random().toString(36).substr(2, 9).toUpperCase()
+const receiptId = ref('')
 
 interface Receipt {
   date: Date
@@ -121,36 +122,56 @@ interface Receipt {
   paymentDate: Date
 }
 
-// Mock receipt data
+// 收据数据
 const receipt = ref<Receipt>({
   date: new Date(),
-  customerName: 'John Doe',
-  customerEmail: 'john.doe@example.com',
-  scooterId: 1001,
-  startTime: new Date(Date.now() - 60 * 60 * 1000),
+  customerName: '',
+  customerEmail: '',
+  scooterId: 0,
+  startTime: new Date(),
   endTime: new Date(),
-  location: 'Central Park',
-  duration: 60,
-  baseRate: 10.00,
-  additionalCharges: 2.50,
-  taxRate: 0.10,
-  paymentMethod: '**** **** **** 1234 (Visa)',
-  transactionId: 'TXN' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+  location: '',
+  duration: 0,
+  baseRate: 0,
+  additionalCharges: 0,
+  taxRate: 0,
+  paymentMethod: '',
+  transactionId: '',
   paymentDate: new Date()
 })
 
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date)
+// Apply the same robust date formatting as in BookingListView
+const formatDate = (dateString: string | Date | null | undefined) => {
+  if (!dateString) return ''; // Handle null or undefined dates gracefully
+  try {
+    // Explicitly create a Date object from the input string/Date
+    const date = new Date(dateString);
+    // Check if the date is valid after parsing
+    if (isNaN(date.getTime())) {
+      console.error('[ReceiptView] Invalid date value received:', dateString);
+      return 'Invalid Date';
+    }
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date); // Format the Date object
+  } catch (error) {
+    console.error('[ReceiptView] Error formatting date:', dateString, error);
+    return 'Error';
+  }
 }
 
 const calculateDuration = (receipt: Receipt) => {
-  const duration = receipt.endTime.getTime() - receipt.startTime.getTime()
+  // Ensure startTime and endTime are Date objects before calculation
+  const startTime = new Date(receipt.startTime);
+  const endTime = new Date(receipt.endTime);
+  if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+    return 'Invalid Date Range';
+  }
+  const duration = endTime.getTime() - startTime.getTime()
   const hours = Math.floor(duration / (1000 * 60 * 60))
   const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60))
   return `${hours}h ${minutes}m`
@@ -178,11 +199,39 @@ const emailReceipt = () => {
 
 onMounted(async () => {
   try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500))
-    loading.value = false
+    // 获取预订详情
+    const bookingRes = await bookingApi.getBookingById(bookingId)
+    const booking = bookingRes.data
+    // 获取付款记录
+    const paymentsRes = await api.get(`/api/payments/booking/${bookingId}`)
+    const payments = paymentsRes.data
+    const payment = payments.length > 0 ? payments[0] : null
+
+    if (!payment) {
+      throw new Error('未找到对应的付款记录')
+    }
+
+    // 构建收据数据
+    receipt.value = {
+      date: payment.completedAt || payment.createdAt,
+      customerName: booking.user.name,
+      customerEmail: booking.user.email,
+      scooterId: booking.scooter.id,
+      startTime: new Date(booking.startTime),
+      endTime: new Date(booking.endTime),
+      location: booking.scooter.location,
+      duration: Math.floor((new Date(booking.endTime).getTime() - new Date(booking.startTime).getTime()) / 60000),
+      baseRate: parseFloat(payment.amount) - (payment.discountAmount ? parseFloat(payment.discountAmount) : 0),
+      additionalCharges: payment.discountAmount ? parseFloat(payment.discountAmount) : 0,
+      taxRate: 0,
+      paymentMethod: payment.paymentMethod,
+      transactionId: payment.transactionId,
+      paymentDate: payment.completedAt ? new Date(payment.completedAt) : new Date(payment.createdAt)
+    }
+    receiptId.value = `R${payment.id}`
   } catch (err: any) {
-    error.value = err.message || 'Failed to load receipt'
+    error.value = err.message || '加载收据失败'
+  } finally {
     loading.value = false
   }
 })
@@ -400,4 +449,4 @@ p {
     width: 100%;
   }
 }
-</style> 
+</style>

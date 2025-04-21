@@ -5,6 +5,9 @@ import org.example.escooter_booking_system.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Date;
+
 @Service
 public class UserServiceImpl implements UserService {
 
@@ -31,6 +34,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    @Override
     public User updateUser(Long id, User userDetails) {
         User user = userRepository.findById(id).orElse(null);
         if (user != null) {
@@ -46,5 +54,39 @@ public class UserServiceImpl implements UserService {
     @Override
     public void deleteUser(Long id) {
         userRepository.deleteById(id);
+    }
+
+    @Override
+    public User suspendUser(Long id, String reason) {
+        User user = userRepository.findById(id).orElse(null);
+        if (user != null) {
+            user.setStatus("Suspended");
+            user.setSuspensionReason(reason);
+            user.setSuspendedAt(new Date());
+            return userRepository.save(user);
+        }
+        return null;
+    }
+
+    @Override
+    public User activateUser(Long id) {
+        User user = userRepository.findById(id).orElse(null);
+        if (user != null) {
+            user.setStatus("Active");
+            user.setSuspensionReason(null);
+            user.setSuspendedAt(null);
+            return userRepository.save(user);
+        }
+        return null;
+    }
+
+    @Override
+    public User saveUserNotes(Long id, String notes) {
+        User user = userRepository.findById(id).orElse(null);
+        if (user != null) {
+            user.setNotes(notes);
+            return userRepository.save(user);
+        }
+        return null;
     }
 }

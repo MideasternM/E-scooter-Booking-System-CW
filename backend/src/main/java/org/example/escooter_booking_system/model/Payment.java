@@ -1,10 +1,12 @@
 package org.example.escooter_booking_system.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.util.Date;
 
 @Entity
+@JsonIgnoreProperties({ "booking" })
 public class Payment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

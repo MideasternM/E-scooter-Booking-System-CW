@@ -21,7 +21,12 @@
             </select>
         </div>
 
-        <div class="table-container">
+        <!-- Add Loading/Error/Empty States -->
+        <div v-if="isLoading" class="loading-message">Loading bookings...</div>
+        <div v-else-if="apiError" class="error-message">{{ apiError }}</div>
+        <div v-else-if="bookings.length === 0" class="empty-message">No bookings found.</div>
+
+        <div v-else class="table-container">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -39,15 +44,15 @@
                     <tr v-for="booking in filteredBookings" :key="booking.id">
                         <td>#{{ booking.id }}</td>
                         <td>{{ booking.userName }}</td>
-                        <td>Scooter #{{ booking.scooterId }}</td>
+                        <td>#{{ booking.scooterId }}</td>
                         <td>{{ formatDate(booking.startTime) }}</td>
                         <td>{{ booking.endTime ? formatDate(booking.endTime) : '-' }}</td>
                         <td>
-                            <span class="status-badge" :class="booking.status.toLowerCase()">
-                                {{ booking.status }}
+                            <span class="status-badge" :class="(booking.status || '').toLowerCase()">
+                                {{ booking.status || 'Unknown' }}
                             </span>
                         </td>
-                        <td>${{ booking.amount.toFixed(2) }}</td>
+                        <td>${{ (booking.amount ?? 0).toFixed(2) }}</td>
                         <td class="actions-cell">
                             <button class="action-btn view" @click="viewBookingDetails(booking.id)">
                                 View
@@ -63,14 +68,14 @@
         </div>
 
         <!-- View Booking Details Modal -->
-        <div v-if="showDetailsModal" class="modal-overlay">
-            <div class="modal-container">
+        <div v-if="showDetailsModal && selectedBooking" class="modal-overlay" @click="closeDetailsModal">
+            <div class="modal-container" @click.stop>
                 <div class="modal-header">
                     <h3>Booking Details #{{ selectedBooking.id }}</h3>
-                    <button class="close-btn" @click="showDetailsModal = false">&times;</button>
+                    <button class="close-btn" @click="closeDetailsModal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="booking-details">
+                    <div v-if="selectedBooking" class="booking-details">
                         <div class="detail-section">
                             <h4>User Information</h4>
                             <p><strong>Name:</strong> {{ selectedBooking.userName }}</p>
@@ -79,7 +84,7 @@
 
                         <div class="detail-section">
                             <h4>Scooter Information</h4>
-                            <p><strong>Scooter ID:</strong> #{{ selectedBooking.scooterId }}</p>
+                            <p><strong>ID:</strong> #{{ selectedBooking.scooterId }}</p>
                             <p><strong>Location:</strong> {{ selectedBooking.location }}</p>
                         </div>
 
@@ -87,22 +92,21 @@
                             <h4>Booking Information</h4>
                             <p><strong>Start Time:</strong> {{ formatDateTime(selectedBooking.startTime) }}</p>
                             <p><strong>End Time:</strong> {{ selectedBooking.endTime ?
-                    formatDateTime(selectedBooking.endTime) : 'Not ended yet' }}</p>
+                                formatDateTime(selectedBooking.endTime) : 'Not ended yet' }}</p>
                             <p><strong>Duration:</strong> {{ calculateDuration(selectedBooking) }}</p>
                             <p><strong>Status:</strong>
-                                <span class="status-badge" :class="selectedBooking.status.toLowerCase()">
-                                    {{ selectedBooking.status }}
+                                <span class="status-badge" :class="(selectedBooking.status || '').toLowerCase()">
+                                    {{ selectedBooking.status || 'Unknown' }}
                                 </span>
                             </p>
                         </div>
 
                         <div class="detail-section">
                             <h4>Payment Information</h4>
-                            <p><strong>Base Rate:</strong> ${{ selectedBooking.baseRate?.toFixed(2) || '0.00' }}</p>
-                            <p><strong>Additional Charges:</strong> ${{ selectedBooking.additionalCharges?.toFixed(2) ||
-                    '0.00' }}</p>
+                            <p><strong>Base Rate:</strong> ${{ selectedBooking.rawBookingData?.payment?.baseRate?.toFixed(2) || 'N/A' }}</p>
+                            <p><strong>Additional Charges:</strong> ${{ selectedBooking.rawBookingData?.payment?.additionalCharges?.toFixed(2) || 'N/A' }}</p>
                             <p><strong>Total Amount:</strong> ${{ selectedBooking.amount.toFixed(2) }}</p>
-                            <p><strong>Payment Status:</strong> {{ selectedBooking.paymentStatus || 'Not paid' }}</p>
+                            <p><strong>Payment Status:</strong> {{ selectedBooking.rawBookingData?.payment?.status || 'N/A' }}</p>
                         </div>
                     </div>
                 </div>
@@ -110,19 +114,21 @@
         </div>
 
         <!-- Cancel Booking Confirmation Modal -->
-        <div v-if="showCancelModal" class="modal-overlay">
-            <div class="modal-container delete-modal">
+        <div v-if="showCancelModal && cancellingBooking" class="modal-overlay" @click="closeCancelModal">
+            <div class="modal-container delete-modal" @click.stop>
                 <div class="modal-header">
                     <h3>Confirm Cancellation</h3>
-                    <button class="close-btn" @click="showCancelModal = false">&times;</button>
+                    <button class="close-btn" @click="closeCancelModal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure you want to cancel Booking #{{ cancellingBooking.id }}?</p>
-                    <p class="warning">This action cannot be undone.</p>
-                    <div class="form-actions">
-                        <button type="button" class="cancel-btn" @click="showCancelModal = false">No, Keep
-                            Booking</button>
-                        <button type="button" class="delete-btn" @click="cancelBooking">Yes, Cancel Booking</button>
+                    <div v-if="cancellingBooking">
+                        <p>Are you sure you want to cancel Booking #{{ cancellingBooking.id }}?</p>
+                        <p class="warning">This action cannot be undone.</p>
+                        <div class="form-actions">
+                            <button type="button" class="cancel-btn" @click="closeCancelModal">No, Keep
+                                Booking</button>
+                            <button type="button" class="delete-btn" @click="cancelBooking">Yes, Cancel Booking</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -133,25 +139,46 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { adminApi } from '../services/api'
+import { parseISO, format as formatDateFn } from 'date-fns'
 
-interface Booking {
-    id: number
-    userId: number
-    userName: string
-    scooterId: number
-    location: string
-    startTime: Date
-    endTime?: Date
-    status: string
-    baseRate?: number
-    additionalCharges?: number
-    amount: number
-    paymentStatus?: string
+// Define a more accurate interface based on expected API response
+interface ApiBookingResponse {
+    id: number;
+    status: string;
+    startTime: string; // Expect string from API
+    endTime?: string | null; // Expect string from API
+    createdAt: string;
+    user?: { id: number; username?: string; name?: string; };
+    scooter?: { id: number; scooterCode?: string; location?: string };
+    payment?: {
+        amount?: number;
+        status?: string;
+        baseRate?: number;
+        additionalCharges?: number;
+        completedAt?: string | Date;
+    };
+}
+
+// Define the structure used within the component
+interface ProcessedBooking {
+    id: number;
+    userId: number;
+    userName: string;
+    scooterId: number;
+    location: string;
+    startTime: Date | null; // Store as Date object
+    endTime?: Date | null; // Store as Date object
+    status: string;
+    amount: number;
+    // Keep other relevant raw data if needed for modals?
+    rawBookingData?: ApiBookingResponse;
 }
 
 // State variables
-const bookings = ref<Booking[]>([])
+const bookings = ref<ProcessedBooking[]>([]) // Store processed bookings
+const isLoading = ref(true); // Loading state
+const apiError = ref<string | null>(null); // Error state
 const searchQuery = ref('')
 const filterStatus = ref('all')
 const sortBy = ref('date')
@@ -159,109 +186,15 @@ const sortBy = ref('date')
 // Modal state
 const showDetailsModal = ref(false)
 const showCancelModal = ref(false)
-
-// Selected booking for details or actions
-const selectedBooking = ref<Booking>({
-    id: 0,
-    userId: 0,
-    userName: '',
-    scooterId: 0,
-    location: '',
-    startTime: new Date(),
-    status: '',
-    amount: 0
-})
-
-const cancellingBooking = ref<Booking>({
-    id: 0,
-    userId: 0,
-    userName: '',
-    scooterId: 0,
-    location: '',
-    startTime: new Date(),
-    status: '',
-    amount: 0
-})
+const selectedBooking = ref<ProcessedBooking | null>(null) // Use ProcessedBooking
+const cancellingBooking = ref<ProcessedBooking | null>(null)
 
 const router = useRouter()
 
-// Mock data
-const mockBookings: Booking[] = [
-    {
-        id: 1001,
-        userId: 101,
-        userName: 'John Smith',
-        scooterId: 5001,
-        location: 'Central Park',
-        startTime: new Date(Date.now() - 3600000),
-        status: 'Active',
-        baseRate: 10.00,
-        additionalCharges: 5.50,
-        amount: 15.50,
-        paymentStatus: 'Pending'
-    },
-    {
-        id: 1000,
-        userId: 102,
-        userName: 'Emma Johnson',
-        scooterId: 5003,
-        location: 'City Square',
-        startTime: new Date(Date.now() - 7200000),
-        status: 'Active',
-        baseRate: 10.00,
-        additionalCharges: 2.75,
-        amount: 12.75,
-        paymentStatus: 'Pending'
-    },
-    {
-        id: 999,
-        userId: 103,
-        userName: 'Michael Brown',
-        scooterId: 5010,
-        location: 'Main Street',
-        startTime: new Date(Date.now() - 86400000),
-        endTime: new Date(Date.now() - 82800000),
-        status: 'Completed',
-        baseRate: 5.00,
-        additionalCharges: 3.25,
-        amount: 8.25,
-        paymentStatus: 'Paid'
-    },
-    {
-        id: 998,
-        userId: 104,
-        userName: 'Sarah Davis',
-        scooterId: 5002,
-        location: 'University Campus',
-        startTime: new Date(Date.now() - 172800000),
-        endTime: new Date(Date.now() - 169200000),
-        status: 'Completed',
-        baseRate: 7.50,
-        additionalCharges: 3.00,
-        amount: 10.50,
-        paymentStatus: 'Paid'
-    },
-    {
-        id: 997,
-        userId: 105,
-        userName: 'David Wilson',
-        scooterId: 5007,
-        location: 'Downtown',
-        startTime: new Date(Date.now() - 259200000),
-        endTime: new Date(Date.now() - 255600000),
-        status: 'Cancelled',
-        baseRate: 7.50,
-        additionalCharges: 2.25,
-        amount: 9.75,
-        paymentStatus: 'Refunded'
-    }
-]
-
 // Computed properties
 const filteredBookings = computed(() => {
-    let result = [...bookings.value]
+    let result = [...bookings.value];
 
-    // Apply search filter
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase()
         result = result.filter(booking =>
@@ -271,114 +204,161 @@ const filteredBookings = computed(() => {
         )
     }
 
-    // Apply status filter
     if (filterStatus.value !== 'all') {
-        const statusMap: Record<string, string> = {
-            'active': 'Active',
-            'completed': 'Completed',
-            'cancelled': 'Cancelled'
-        }
         result = result.filter(booking =>
-            booking.status === statusMap[filterStatus.value]
-        )
+            (booking.status || '').toLowerCase() === filterStatus.value
+        );
     }
 
-    // Apply sorting
     result.sort((a, b) => {
-        if (sortBy.value === 'date') {
-            return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-        } else if (sortBy.value === 'duration') {
-            const aDuration = a.endTime ? new Date(a.endTime).getTime() - new Date(a.startTime).getTime() : Infinity
-            const bDuration = b.endTime ? new Date(b.endTime).getTime() - new Date(b.startTime).getTime() : Infinity
-            return bDuration - aDuration
-        } else if (sortBy.value === 'cost') {
-            return b.amount - a.amount
-        }
-        return 0
-    })
+        const startTimeA = a.startTime?.getTime() ?? 0;
+        const startTimeB = b.startTime?.getTime() ?? 0;
+        const endTimeA = a.endTime?.getTime() ?? 0;
+        const endTimeB = b.endTime?.getTime() ?? 0;
 
-    return result
-})
+        if (sortBy.value === 'date') {
+            return startTimeB - startTimeA;
+        } else if (sortBy.value === 'duration') {
+            const durationA = endTimeA && startTimeA ? endTimeA - startTimeA : -1; // Handle nulls
+            const durationB = endTimeB && startTimeB ? endTimeB - startTimeB : -1;
+            // Sort ongoing (-1) last, then by duration descending
+            if (durationA === -1 && durationB === -1) return 0;
+            if (durationA === -1) return 1;
+            if (durationB === -1) return -1;
+            return durationB - durationA;
+        } else if (sortBy.value === 'cost') {
+            return (b.amount ?? 0) - (a.amount ?? 0);
+        }
+        return 0;
+    });
+
+    return result;
+});
+
+// Functions related to API interaction
+const fetchBookings = async () => {
+    isLoading.value = true;
+    apiError.value = null;
+    try {
+        const response = await adminApi.getAllBookings();
+        // Process the raw API data
+        bookings.value = response.data.map((rawBooking: ApiBookingResponse): ProcessedBooking => {
+            let parsedStartTime: Date | null = null;
+            let parsedEndTime: Date | null = null;
+            try { parsedStartTime = rawBooking.startTime ? parseISO(rawBooking.startTime) : null; } catch(e) { console.error("Error parsing start time:", rawBooking.startTime, e);}
+            try { parsedEndTime = rawBooking.endTime ? parseISO(rawBooking.endTime) : null; } catch(e) { console.error("Error parsing end time:", rawBooking.endTime, e); }
+
+            return {
+                id: rawBooking.id,
+                userId: rawBooking.user?.id ?? 0,
+                userName: rawBooking.user?.username || rawBooking.user?.name || 'Unknown User',
+                scooterId: rawBooking.scooter?.id ?? 0,
+                location: rawBooking.scooter?.location || 'Unknown Location',
+                startTime: parsedStartTime,
+                endTime: parsedEndTime,
+                status: rawBooking.status || 'Unknown',
+                amount: rawBooking.payment?.amount ?? 0,
+                rawBookingData: rawBooking // Keep raw data if needed by modals
+            };
+        });
+    } catch (error: any) {
+        console.error('Failed to fetch bookings:', error);
+        apiError.value = `Failed to load bookings: ${error.message || 'Unknown error'}`;
+        // alert('Failed to load bookings.'); // Replaced by error message display
+        bookings.value = []; // Clear bookings on error
+    } finally {
+        isLoading.value = false;
+    }
+};
 
 // Methods
-const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    }).format(date)
-}
-
-const formatDateTime = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    }).format(date)
-}
-
-const calculateDuration = (booking: Booking) => {
-    if (!booking.endTime) {
-        return 'Ongoing'
+const formatDate = (dateObj: Date | null | undefined) => {
+    if (!dateObj || !(dateObj instanceof Date) || isNaN(dateObj.getTime())) return 'N/A';
+    try {
+        return formatDateFn(dateObj, 'MMM d, yyyy, hh:mm a');
+    } catch (error) {
+        console.error('Error formatting date:', dateObj, error);
+        return 'Error';
     }
+};
 
-    const start = new Date(booking.startTime).getTime()
-    const end = new Date(booking.endTime).getTime()
-    const durationMs = end - start
+const formatDateTime = (dateObj: Date | null | undefined) => {
+    if (!dateObj || !(dateObj instanceof Date) || isNaN(dateObj.getTime())) return 'N/A';
+    // Use a more detailed format for the modal?
+    return formatDateFn(dateObj, 'MMM d, yyyy, hh:mm:ss a');
+};
 
-    const hours = Math.floor(durationMs / (1000 * 60 * 60))
-    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60))
-
-    return `${hours}h ${minutes}m`
-}
-
-const viewBookingDetails = (id: number) => {
-    const booking = bookings.value.find(b => b.id === id)
-    if (booking) {
-        selectedBooking.value = { ...booking }
-        showDetailsModal.value = true
+const calculateDuration = (booking: ProcessedBooking | null): string => {
+    if (!booking || !booking.endTime || !booking.startTime) return 'N/A';
+    try {
+        // Using date-fns formatDistanceStrict might be better here too
+        const durationMs = booking.endTime.getTime() - booking.startTime.getTime();
+        if (durationMs < 0) return 'Invalid';
+        const hours = Math.floor(durationMs / (1000 * 60 * 60))
+        const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60))
+        return `${hours}h ${minutes}m`;
+    } catch (error) {
+        return 'Error';
     }
-}
+};
 
-const confirmCancel = (booking: Booking) => {
-    cancellingBooking.value = { ...booking }
-    showCancelModal.value = true
-}
+const viewBookingDetails = (bookingId: number) => {
+    try {
+        // 创建选定预订的副本，避免引用问题
+        selectedBooking.value = JSON.parse(JSON.stringify(
+            bookings.value.find(b => b.id === bookingId)
+        )) || null;
+        
+        if (selectedBooking.value) {
+            // 添加body类以防止滚动
+            document.body.classList.add('modal-open');
+            console.log("为模态框选择的预订:", selectedBooking.value);
+            showDetailsModal.value = true;
+        } else {
+            alert('找不到预订详情。');
+        }
+    } catch (error) {
+        console.error('查看预订详情时出错:', error);
+        alert('无法显示预订详情。');
+    }
+};
+
+const confirmCancel = (booking: ProcessedBooking) => {
+    // 创建副本
+    cancellingBooking.value = JSON.parse(JSON.stringify(booking));
+    document.body.classList.add('modal-open');
+    showCancelModal.value = true;
+};
+
+// 添加用于关闭模态框的函数
+const closeDetailsModal = () => {
+    showDetailsModal.value = false;
+    document.body.classList.remove('modal-open');
+};
+
+const closeCancelModal = () => {
+    showCancelModal.value = false;
+    document.body.classList.remove('modal-open');
+};
 
 const cancelBooking = async () => {
+    if (!cancellingBooking.value) return;
     try {
-        // In a real app, you would call the API
-        // await axios.put(`/api/bookings/${cancellingBooking.value.id}/cancel`)
-
-        // For now, update the local state
-        const index = bookings.value.findIndex(b => b.id === cancellingBooking.value.id)
-        if (index !== -1) {
-            bookings.value[index].status = 'Cancelled'
-            bookings.value[index].endTime = new Date()
-        }
-
-        showCancelModal.value = false
-    } catch (error) {
-        console.error('Failed to cancel booking:', error)
+        await adminApi.cancelBooking(cancellingBooking.value.id);
+        alert(`预订 #${cancellingBooking.value.id} 已成功取消。`);
+        closeCancelModal();
+        cancellingBooking.value = null;
+        fetchBookings(); // 刷新列表
+    } catch (error: any) {
+        console.error('取消预订失败:', error);
+        alert(`取消预订失败: ${error.message || '未知错误'}`);
     }
-}
+};
 
-onMounted(async () => {
-    try {
-        // In a real app, you would fetch the bookings from the API
-        // const response = await axios.get('/api/admin/bookings')
-        // bookings.value = response.data
-
-        // For now, use mock data
-        bookings.value = mockBookings
-    } catch (error) {
-        console.error('Failed to load bookings:', error)
-    }
-})
+// Lifecycle hook
+onMounted(() => {
+    fetchBookings();
+});
 </script>
 
 <style scoped>
@@ -493,32 +473,36 @@ h1 {
     opacity: 0.9;
 }
 
-/* Modal Styles */
+/* Modal Styles (Copied from AdminDashboardView) */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.7);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 9999; /* Keep high z-index */
+    visibility: visible;
+    opacity: 1;
 }
 
 .modal-container {
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
     width: 90%;
-    max-width: 600px;
+    max-width: 700px; /* Wider modal for details */
     max-height: 90vh;
-    overflow-y: auto;
-}
-
-.delete-modal {
-    max-width: 450px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 10000; /* Higher than overlay */
+    visibility: visible;
+    opacity: 1;
+    /* overflow: hidden; */ /* Let modal-body handle scroll */
 }
 
 .modal-header {
@@ -526,80 +510,97 @@ h1 {
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1.5rem;
-    border-bottom: 1px solid #eee;
-}
-
-.modal-header h3 {
-    margin: 0;
+    border-bottom: 1px solid #f1f1f1;
     color: #2c3e50;
+    flex-shrink: 0;
 }
-
+.modal-header h3 { margin: 0; font-weight: 600; }
 .close-btn {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: #606f7b;
+    background: none; border: none; font-size: 1.5rem; cursor: pointer;
+    color: #606f7b; padding: 0; line-height: 1; transition: color 0.2s;
 }
+.close-btn:hover { color: #ef4444; }
 
 .modal-body {
-    padding: 1.5rem;
+    padding: 1.25rem;
+    color: #2c3e50;
+    overflow-y: auto; /* Enable vertical scroll within body */
+    flex-grow: 1;
 }
 
+/* Specific details styling */
 .booking-details {
     display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1.5rem;
 }
 
 .detail-section h4 {
-    margin: 0 0 0.5rem;
-    color: #42b983;
+    margin: 0 0 0.75rem;
+    color: #3b82f6; /* Example color for bookings */
     font-size: 1.1rem;
+    font-weight: 600;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
 }
 
 .detail-section p {
-    margin: 0.25rem 0;
-    color: #2c3e50;
+    margin: 0.4rem 0;
+    line-height: 1.6;
 }
 
-.warning {
-    color: #e74c3c;
-    font-weight: 500;
+/* Styles for delete confirmation modal */
+.delete-modal .modal-header {
+    background-color: #fee2e2; /* Light red header */
+    color: #b91c1c; /* Darker red text */
 }
 
-.form-actions {
+.delete-modal .modal-body p {
+    margin-bottom: 0.5rem;
+}
+
+.delete-modal .warning {
+    color: #ef4444; /* Red warning text */
+    font-weight: 600;
+    margin-top: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.delete-modal .form-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 1rem;
-    margin-top: 1.5rem;
+    gap: 0.75rem;
+    margin-top: 1rem;
 }
 
-.cancel-btn {
+.delete-modal .cancel-btn {
+    background-color: #e5e7eb; /* Light gray */
+    color: #374151;
     padding: 0.5rem 1rem;
-    background-color: #f8f9fa;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    color: #606f7b;
-    cursor: pointer;
-}
-
-.delete-btn {
-    padding: 0.5rem 1rem;
-    background-color: #e74c3c;
     border: none;
-    border-radius: 4px;
-    color: white;
+    border-radius: 6px;
     cursor: pointer;
+    transition: background-color 0.2s;
 }
 
-.submit-btn {
-    padding: 0.5rem 1rem;
-    background-color: #42b983;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    cursor: pointer;
+.delete-modal .cancel-btn:hover {
+    background-color: #d1d5db;
 }
+
+.delete-modal .delete-btn {
+    background-color: #ef4444; /* Red */
+    color: white;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.delete-modal .delete-btn:hover {
+    background-color: #dc2626;
+}
+/* --- End Modal Styles --- */
 
 @media (max-width: 768px) {
     .filters {

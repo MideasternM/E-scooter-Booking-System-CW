@@ -8,23 +8,13 @@
             <form @submit.prevent="handleLogin">
                 <div class="form-group">
                     <label>Username:</label>
-                    <input 
-                        v-model="username" 
-                        type="text" 
-                        required 
-                        :disabled="loading"
-                        placeholder="Enter your username"
-                    />
+                    <input v-model="username" type="text" required :disabled="loading"
+                        placeholder="Enter your username" />
                 </div>
                 <div class="form-group">
                     <label>Password:</label>
-                    <input 
-                        v-model="password" 
-                        type="password" 
-                        required 
-                        :disabled="loading"
-                        placeholder="Enter your password"
-                    />
+                    <input v-model="password" type="password" required :disabled="loading"
+                        placeholder="Enter your password" />
                 </div>
                 <button type="submit" :disabled="loading" class="login-button">
                     {{ loading ? 'Logging in...' : 'Login' }}
@@ -40,27 +30,29 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { useAuthStore } from '../stores/auth'
 
 const username = ref('')
 const password = ref('')
 const loading = ref(false)
 const error = ref('')
 const router = useRouter()
+const auth = useAuthStore()
 
 const handleLogin = async () => {
     loading.value = true
     error.value = ''
-    
+
     try {
-        const response = await axios.post('/api/users/login', {
-            username: username.value,
-            password: password.value
-        })
-        localStorage.setItem('token', response.data.token)
-        router.push('/')
+        const result = await auth.userLogin(username.value, password.value)
+        if (result.success) {
+            router.push('/')
+        } else {
+            error.value = 'Login failed, please check username and password'
+        }
     } catch (err: any) {
-        error.value = err.response?.data?.message || 'Login failed, please try again'
+        console.error('Login error:', err)
+        error.value = 'An unexpected error occurred during login'
     } finally {
         loading.value = false
     }

@@ -1,11 +1,14 @@
 <template>
   <div class="report-issue-container">
     <div class="header">
-      <router-link :to="`/booking/${bookingId}`" class="back-button">
-        <span>&larr;</span> Back to Booking Details
-      </router-link>
+      <button @click="router.back()" class="back-button">
+        <span>&larr;</span> Back
+      </button>
       <h1>Report Issue</h1>
-      <p class="subtitle">Booking #{{ bookingId }}</p>
+      <p class="subtitle">
+        Scooter #{{ scooterId }}
+        <span v-if="bookingId"> (from Booking #{{ bookingId }})</span>
+      </p>
     </div>
 
     <div class="report-form">
@@ -126,23 +129,39 @@
     <div v-if="showSuccessModal" class="modal">
       <div class="modal-content">
         <h2>Report Submitted Successfully</h2>
-        <p>Your issue report has been received. Reference number: #{{ reportId }}</p>
-        <button @click="goToBookingDetails" class="modal-button">Back to Booking Details</button>
+        <p>Your issue report has been received. Issue ID: #{{ reportId }}</p>
+        <button @click="goToBookingDetails" class="modal-button">OK</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { issueApi } from '../services/api'
+import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
 const router = useRouter()
-const bookingId = route.params.id
+const authStore = useAuthStore()
+
+const bookingId = computed(() => {
+  const idFromQuery = route.query.bookingId;
+  const id = Number(idFromQuery);
+  return isNaN(id) ? null : id;
+});
+
+const scooterId = computed(() => {
+  const id = Number(route.params.scooterId);
+  return isNaN(id) ? null : id;
+});
+
+const userId = ref<number | null>(null);
+
 const isSubmitting = ref(false)
 const showSuccessModal = ref(false)
-const reportId = ref('')
+const reportId = ref<number | null>(null)
 
 interface PhotoData {
   file: File
@@ -184,6 +203,7 @@ const handleFileUpload = (event: Event) => {
     }
     reader.readAsDataURL(file)
   })
+  input.value = '';
 }
 
 const removePhoto = (index: number) => {
@@ -191,33 +211,63 @@ const removePhoto = (index: number) => {
 }
 
 const submitReport = async () => {
+  if (!userId.value) {
+      alert('User not logged in. Cannot submit report.');
+      return;
+  }
+  if (!scooterId.value) {
+       alert('Invalid scooter ID. Cannot submit report.');
+       return;
+  }
+   if (!formData.value.issueType || !formData.value.severity || !formData.value.description || !formData.value.location) {
+       alert('Please fill in all required fields (Issue Type, Severity, Description, Location).');
+       return;
+   }
+
   isSubmitting.value = true
-  
+
+  const payload = {
+    userId: userId.value,
+    scooterId: scooterId.value,
+    bookingId: bookingId.value || undefined,
+    faultType: formData.value.issueType,
+    severity: formData.value.severity,
+    description: formData.value.description,
+    location: formData.value.location,
+  };
+
   try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    // Generate a random report ID
-    reportId.value = Math.random().toString(36).substr(2, 9).toUpperCase()
-    
-    showSuccessModal.value = true
-  } catch (error) {
-    console.error('Error submitting report:', error)
-    alert('Failed to submit report. Please try again.')
+    const response = await issueApi.reportIssue(payload);
+
+    reportId.value = response.data.id;
+    showSuccessModal.value = true;
+  } catch (error: any) {
+    console.error('Error submitting report:', error);
+    alert(`Failed to submit report: ${error.response?.data?.message || error.message || 'Please try again.'}`);
   } finally {
-    isSubmitting.value = false
+    isSubmitting.value = false;
   }
 }
 
 const cancelReport = () => {
   if (confirm('Are you sure you want to cancel? All entered information will be lost.')) {
-    router.back()
+      router.back();
   }
 }
 
 const goToBookingDetails = () => {
-  router.push(`/booking/${bookingId}`)
+  router.back();
 }
+
+onMounted(() => {
+  userId.value = authStore.getCurrentUserId();
+  if (!userId.value) {
+    alert('Please log in to report an issue.');
+    router.push('/login');
+  }
+  console.log("Report Issue mounted. ScooterID:", scooterId.value, "BookingID:", bookingId.value);
+});
+
 </script>
 
 <style scoped>
@@ -232,11 +282,15 @@ const goToBookingDetails = () => {
 }
 
 .back-button {
+  background: none;
+  border: none;
+  color: #505a66;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  color: #606f7b;
-  text-decoration: none;
-  margin-bottom: 1rem;
+  font-size: 1rem;
+  padding: 0.5rem 0;
+  margin-right: auto;
 }
 
 .back-button:hover {
@@ -245,16 +299,19 @@ const goToBookingDetails = () => {
 
 .back-button span {
   margin-right: 0.5rem;
+  font-size: 1.2rem;
 }
 
 h1 {
   color: #2c3e50;
-  margin: 0 0 0.5rem;
+  margin: 0 auto;
+  padding-left: 1rem;
 }
 
 .subtitle {
-  color: #606f7b;
-  margin: 0;
+  margin-left: auto;
+  font-size: 0.9rem;
+  color: #6c757d;
 }
 
 .report-form {
@@ -513,4 +570,4 @@ textarea:focus {
     width: 100%;
   }
 }
-</style> 
+</style>

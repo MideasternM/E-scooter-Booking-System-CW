@@ -4,11 +4,7 @@
       <h1>Available Scooters</h1>
       <div class="filters">
         <div class="search-box">
-          <input 
-            v-model="searchQuery" 
-            type="text" 
-            placeholder="Search by ID or location"
-          />
+          <input v-model="searchQuery" type="text" placeholder="Search by ID or location" />
         </div>
         <select v-model="filterStatus">
           <option value="all">All Status</option>
@@ -25,33 +21,30 @@
     </div>
 
     <div class="scooter-grid">
-      <div v-for="scooter in filteredScooters" 
-           :key="scooter.id" 
-           class="scooter-card"
-           :class="{ 'unavailable': !scooter.isAvailable }">
+      <div v-for="scooter in filteredScooters" :key="scooter.id" class="scooter-card"
+        :class="{ 'unavailable': !scooter.available }">
         <div class="scooter-image">
           <img :src="scooter.imageUrl" alt="Scooter" />
-          <div class="status-badge" :class="scooter.status.toLowerCase()">
-            {{ scooter.status }}
+          <div class="status-badge" :class="scooter.available ? 'available' : 'unavailable'">
+            {{ scooter.available ? 'Available' : 'Unavailable' }}
           </div>
         </div>
         <div class="scooter-info">
           <h3>Scooter #{{ scooter.id }}</h3>
+          <div class="scooter-details">
+            <p><strong>Model:</strong> {{ scooter.model || 'Standard' }}</p>
+            <p><strong>Location:</strong> {{ scooter.location }}</p>
+            <p><strong>Distance:</strong> {{ getDistanceToScooter(scooter) }}</p>
+          </div>
           <div class="battery-indicator">
             <div class="battery-bar">
-              <div :style="{ width: scooter.batteryLevel + '%' }" 
-                   :class="getBatteryClass(scooter.batteryLevel)">
+              <div :style="{ width: scooter.batteryLevel + '%' }" :class="getBatteryClass(scooter.batteryLevel)">
               </div>
             </div>
             <span>{{ scooter.batteryLevel }}%</span>
           </div>
-          <p><strong>Location:</strong> {{ scooter.location }}</p>
-          <p><strong>Distance:</strong> {{ scooter.distance }}km away</p>
-          <button 
-            @click="bookScooter(scooter)" 
-            :disabled="!scooter.isAvailable"
-            class="book-button">
-            {{ scooter.isAvailable ? 'Book Now' : 'Unavailable' }}
+          <button @click="bookScooter(scooter)" :disabled="!scooter.available" class="book-button">
+            {{ scooter.available ? 'Book Now' : 'Unavailable' }}
           </button>
         </div>
       </div>
@@ -60,82 +53,83 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { adminApi } from '../services/api'
+import { bookingApi } from '../services/api'
+// @ts-ignore 
+import L from 'leaflet';
 
 interface Scooter {
-  id: number
-  status: string
-  batteryLevel: number
-  location: string
-  distance: number
-  isAvailable: boolean
-  imageUrl: string
+  id: number;
+  model?: string;
+  imageUrl?: string;
+  location: string;
+  latitude?: number | null; 
+  longitude?: number | null;
+  batteryLevel: number;
+  available: boolean;
 }
 
-// Mock data
-const mockScooters: Scooter[] = [
-  {
-    id: 1001,
-    status: 'Available',
-    batteryLevel: 95,
-    location: 'Central Park',
-    distance: 0.5,
-    isAvailable: true,
-    imageUrl: '/images/scooter-1.jpg'
-  },
-  {
-    id: 1002,
-    status: 'In Use',
-    batteryLevel: 60,
-    location: 'Main Street',
-    distance: 1.2,
-    isAvailable: false,
-    imageUrl: '/images/scooter-2.jpg'
-  },
-  {
-    id: 1003,
-    status: 'Available',
-    batteryLevel: 85,
-    location: 'City Square',
-    distance: 0.8,
-    isAvailable: true,
-    imageUrl: '/images/scooter-1.jpg'
-  },
-  {
-    id: 1004,
-    status: 'Maintenance',
-    batteryLevel: 30,
-    location: 'West Station',
-    distance: 2.1,
-    isAvailable: false,
-    imageUrl: '/images/scooter-2.jpg'
-  },
-  {
-    id: 1005,
-    status: 'Available',
-    batteryLevel: 75,
-    location: 'Shopping Mall',
-    distance: 1.5,
-    isAvailable: true,
-    imageUrl: '/images/scooter-1.jpg'
-  },
-  {
-    id: 1006,
-    status: 'Available',
-    batteryLevel: 90,
-    location: 'University Campus',
-    distance: 0.3,
-    isAvailable: true,
-    imageUrl: '/images/scooter-2.jpg'
-  }
-]
-
-const scooters = ref<Scooter[]>(mockScooters)
+const scooters = ref<Scooter[]>([])
 const searchQuery = ref('')
 const filterStatus = ref('all')
 const sortBy = ref('id')
 const router = useRouter()
+
+// Define a fixed virtual user location (e.g., near SWJTU South Gate)
+const virtualUserLocation = L.latLng(30.7485, 103.9780);
+
+// Helper to get distance in meters for sorting
+const getDistanceMeters = (scooter: Scooter): number => {
+    if (scooter.latitude != null && scooter.longitude != null && !isNaN(scooter.latitude) && !isNaN(scooter.longitude)) {
+        try {
+            const scooterLatLng = L.latLng(scooter.latitude, scooter.longitude);
+            return virtualUserLocation.distanceTo(scooterLatLng);
+        } catch (e) {
+            return Infinity; // Return a large number on error
+        }
+    } else {
+        return Infinity; // Return a large number if no coordinates
+    }
+};
+
+// Function to get formatted distance string for display
+const getDistanceToScooter = (scooter: Scooter): string => {
+    const distanceMeters = getDistanceMeters(scooter); // Reuse meter calculation
+    if (distanceMeters === Infinity) {
+         return 'N/A';
+    }
+    if (distanceMeters < 1000) {
+        return `${Math.round(distanceMeters)} m`;
+    } else {
+        return `${(distanceMeters / 1000).toFixed(1)} km`;
+    }
+};
+
+onMounted(async () => {
+  try {
+    const response = await adminApi.getAllScooters()
+    scooters.value = response.data.map((s: any): Scooter => {
+      // 分配滑板车图片URL，根据ID选择不同图片
+      const imageIndex = (s.id % 4) + 1; // 从4张图片中选择(scooter-1.jpg到scooter-4.jpg)
+      const imageUrl = `/images/scooter-${imageIndex}.jpg`;
+      
+      return {
+        id: s.id,
+        model: s.model,
+        imageUrl: imageUrl, // 使用本地图片URL
+        location: s.location,
+        latitude: s.latitude,
+        longitude: s.longitude,
+        batteryLevel: s.batteryLevel ?? 0,
+        available: s.available ?? (s.status === 'Available'),
+      };
+    });
+  } catch (error) {
+    console.error('Failed to fetch scooters', error)
+  }
+})
 
 const filteredScooters = computed(() => {
   let result = [...scooters.value]
@@ -143,7 +137,7 @@ const filteredScooters = computed(() => {
   // Apply search filter
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    result = result.filter(scooter => 
+    result = result.filter(scooter =>
       scooter.id.toString().includes(query) ||
       scooter.location.toLowerCase().includes(query)
     )
@@ -151,9 +145,12 @@ const filteredScooters = computed(() => {
 
   // Apply status filter
   if (filterStatus.value !== 'all') {
-    result = result.filter(scooter => 
-      scooter.status.toLowerCase() === filterStatus.value
-    )
+    const targetAvailability = filterStatus.value === 'available'
+    if (filterStatus.value === 'available') {
+      result = result.filter(scooter => scooter.available === targetAvailability)
+    } else if (filterStatus.value !== 'all') {
+      result = result.filter(scooter => !scooter.available)
+    }
   }
 
   // Apply sorting
@@ -162,7 +159,8 @@ const filteredScooters = computed(() => {
       case 'battery':
         return b.batteryLevel - a.batteryLevel
       case 'distance':
-        return a.distance - b.distance
+        // Use the helper function to get meters for comparison
+        return getDistanceMeters(a) - getDistanceMeters(b);
       default:
         return a.id - b.id
     }
@@ -178,56 +176,75 @@ const getBatteryClass = (level: number) => {
 }
 
 const bookScooter = (scooter: Scooter) => {
-  router.push(`/booking/${scooter.id}`)
+  router.push(`/booking/create/${scooter.id}`)
 }
 </script>
 
 <style scoped>
 .scooter-list-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #f8f9fa;
 }
 
 .header {
-  margin-bottom: 2rem;
+  background-color: #ffffff;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
 .header h1 {
   color: #2c3e50;
-  margin-bottom: 1rem;
+  margin-bottom: 1.2rem;
+  font-weight: 600;
+  font-size: 1.8rem;
 }
 
 .filters {
   display: flex;
   gap: 1rem;
-  margin-bottom: 2rem;
+  margin-bottom: 0;
+  flex-wrap: wrap;
 }
 
 .search-box input,
 .filters select {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 0.7rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
   font-size: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.search-box input:focus,
+.filters select:focus {
+  border-color: #42b983;
+  box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.15);
+  outline: none;
 }
 
 .scooter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 2rem;
+  gap: 1.5rem;
+  padding: 0 2rem 2rem;
 }
 
 .scooter-card {
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
   overflow: hidden;
-  transition: transform 0.3s ease;
+  transition: all 0.3s ease;
+  border: 1px solid #f0f0f0;
 }
 
 .scooter-card:hover {
   transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
 }
 
 .scooter-card.unavailable {
@@ -236,8 +253,8 @@ const bookScooter = (scooter: Scooter) => {
 
 .scooter-image {
   position: relative;
-  height: 150px;
-  background: #f5f5f5;
+  height: 180px;
+  background: #f9f9f9;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -245,14 +262,14 @@ const bookScooter = (scooter: Scooter) => {
 }
 
 .scooter-image img {
-  width: 80%;
-  height: 80%;
+  width: 85%;
+  height: 85%;
   object-fit: contain;
-  transition: transform 0.3s ease;
+  transition: transform 0.4s ease;
 }
 
 .scooter-card:hover .scooter-image img {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 .status-badge {
@@ -260,21 +277,18 @@ const bookScooter = (scooter: Scooter) => {
   top: 1rem;
   right: 1rem;
   padding: 0.5rem 1rem;
-  border-radius: 20px;
+  border-radius: 30px;
   color: white;
-  font-weight: bold;
+  font-weight: 600;
   font-size: 0.875rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .status-badge.available {
   background-color: #42b983;
 }
 
-.status-badge.in-use {
-  background-color: #f39c12;
-}
-
-.status-badge.maintenance {
+.status-badge.unavailable {
   background-color: #e74c3c;
 }
 
@@ -285,23 +299,34 @@ const bookScooter = (scooter: Scooter) => {
 .scooter-info h3 {
   margin: 0 0 1rem;
   color: #2c3e50;
+  font-weight: 600;
+}
+
+.scooter-details {
+  margin-bottom: 1.2rem;
+}
+
+.scooter-details p {
+  margin: 0.5rem 0;
+  color: #505a66;
 }
 
 .battery-indicator {
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .battery-bar {
-  height: 8px;
+  height: 10px;
   background: #eee;
-  border-radius: 4px;
+  border-radius: 10px;
   overflow: hidden;
   margin-bottom: 0.5rem;
 }
 
-.battery-bar > div {
+.battery-bar>div {
   height: 100%;
   transition: width 0.3s ease;
+  border-radius: 10px;
 }
 
 .battery-bar .high {
@@ -318,18 +343,22 @@ const bookScooter = (scooter: Scooter) => {
 
 .book-button {
   width: 100%;
-  padding: 0.8rem;
+  padding: 0.9rem;
   background-color: #42b983;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .book-button:hover:not(:disabled) {
   background-color: #3aa876;
+  box-shadow: 0 4px 10px rgba(66, 185, 131, 0.3);
 }
 
 .book-button:disabled {
@@ -341,9 +370,14 @@ const bookScooter = (scooter: Scooter) => {
   .filters {
     flex-direction: column;
   }
-  
+
   .scooter-grid {
     grid-template-columns: 1fr;
+    padding: 0 1rem 1rem;
+  }
+  
+  .header {
+    padding: 1rem;
   }
 }
 </style>
