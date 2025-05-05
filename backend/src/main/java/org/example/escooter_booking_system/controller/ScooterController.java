@@ -64,9 +64,47 @@ public class ScooterController {
         return ResponseEntity.notFound().build();
     }
 
+    @PutMapping("/{id}/coordinates")
+    public ResponseEntity<Scooter> updateScooterCoordinates(@PathVariable Long id,
+            @RequestBody Map<String, Double> payload) {
+        Double latitude = payload.get("latitude");
+        Double longitude = payload.get("longitude");
+
+        if (latitude == null || longitude == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Scooter scooter = scooterService.getScooterById(id);
+        if (scooter != null) {
+            scooter.setLatitude(latitude);
+            scooter.setLongitude(longitude);
+            Scooter updatedScooter = scooterService.addScooter(scooter); // Save the updated scooter
+            return ResponseEntity.ok(updatedScooter);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteScooter(@PathVariable Long id) {
         scooterService.deleteScooter(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/model")
+    public ResponseEntity<Scooter> updateScooterModel(@PathVariable Long id,
+            @RequestBody Map<String, String> payload) {
+        String model = payload.get("model");
+
+        if (model == null || model.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Scooter scooter = scooterService.getScooterById(id);
+        if (scooter != null) {
+            scooter.setModel(model);
+            Scooter updatedScooter = scooterService.addScooter(scooter); // Save the updated scooter
+            return ResponseEntity.ok(updatedScooter);
+        }
+        return ResponseEntity.notFound().build();
     }
 }

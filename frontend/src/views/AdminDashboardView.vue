@@ -457,12 +457,11 @@ h2 {
 }
 
 /* Stats Grid */
-.stats-grid { 
-  display: grid; 
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); 
-  gap: 1.25rem; 
-  margin-bottom: 1.5rem; 
-  padding: 0 1rem;
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
 }
 .stat-card { 
   background: white; 
@@ -508,13 +507,20 @@ h2 {
 .recent-section {
   margin: 0 1rem 1.5rem 1rem;
 }
-.table-container { 
-  overflow-x: auto; 
-  border-radius: 8px;
+.table-container {
+    width: 100%;
+    overflow-x: auto; /* Enable horizontal scrolling on smaller screens */
+    -webkit-overflow-scrolling: touch; /* Smoother scrolling on iOS */
+    border: 1px solid var(--border-color, #eee);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1rem;
 }
-.data-table { 
-  width: 100%; 
-  border-collapse: collapse; 
+.data-table {
+    width: 100%;
+    min-width: 700px; /* Minimum width before scrollbar appears */
+    border-collapse: collapse;
+    background-color: var(--card-bg, white);
 }
 .data-table th, .data-table td { 
   padding: 0.8rem 1rem; 
@@ -594,12 +600,13 @@ h2 {
     z-index: 9999;
     visibility: visible;
     opacity: 1;
+    padding: 1rem; /* Add padding for smaller screens */
 }
 
 .modal-container {
     /* 响应式尺寸 */
-    width: 90%;
-    max-width: 700px;
+    width: 100%; /* Full width on small screens */
+    max-width: 600px;
     max-height: 90vh;
 
     /* 基本外观和 Flex 布局 */
@@ -645,13 +652,13 @@ h2 {
 .booking-details,
 .issue-details {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.25rem;
+    grid-template-columns: 1fr;
+    gap: 1rem;
 }
 .detail-section h4 {
     margin: 0 0 0.6rem;
     color: #10b981;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
     border-bottom: 1px solid #f1f1f1;
     padding-bottom: 0.4rem;
@@ -660,22 +667,90 @@ h2 {
     margin: 0.3rem 0;
     color: #2c3e50;
     line-height: 1.5;
+    font-size: 0.9rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1200px) {
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 992px) {
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
 }
 
 @media (max-width: 768px) {
-  .stats-grid { 
-    grid-template-columns: 1fr; 
-    padding: 0 0.75rem;
-  }
-  .recent-section {
-    margin: 0 0.75rem 1.25rem 0.75rem;
-  }
-  .data-table th, .data-table td { 
-    padding: 0.6rem 0.4rem; 
-    font-size: 0.875rem; 
-  }
-  .modal-container { 
-    max-width: 95%; 
-  }
+    .admin-dashboard h1 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr 1fr; /* Two columns on smaller tablets */
+        gap: 0.75rem;
+    }
+
+    .stat-card {
+        padding: 1rem;
+    }
+    .stat-card h3 {
+        font-size: 0.9rem;
+    }
+    .stat-value {
+        font-size: 1.8rem;
+    }
+    .stat-breakdown {
+        font-size: 0.8rem;
+    }
+
+    .recent-section {
+        padding: 1rem;
+    }
+    .recent-section h2 {
+        font-size: 1.2rem;
+    }
+
+    .data-table {
+        min-width: 600px; /* Adjust min-width for mobile if needed */
+    }
+    .data-table th,
+    .data-table td {
+        padding: 0.6rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .action-btn {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.75rem;
+    }
+    
+    .modal-header h3 {
+        font-size: 1.1rem;
+    }
+    .modal-body {
+        padding: 1rem;
+    }
+    .detail-section h4 {
+        font-size: 1rem;
+    }
+    .detail-section p {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .stats-grid {
+        grid-template-columns: 1fr; /* Single column on mobile */
+    }
+
+    .data-table th,
+    .data-table td {
+        white-space: nowrap; /* Prevent wrapping inside cells */
+    }
 }
 </style>

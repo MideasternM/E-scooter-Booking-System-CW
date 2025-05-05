@@ -40,53 +40,69 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, nextTick, computed, watch, onBeforeUnmount } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/auth'
-// START: Import Leaflet and API
-import { adminApi } from '../services/api' // Using adminApi temporarily, might need a public endpoint
+// START: Import Leaflet, new MapStore and types
+import { useMapStore } from '../stores/mapStore'; // Import the new map store
+import type { MapItem, ScooterMapItem, StoreMapItem } from '../types/MapItem'; // Import map item types
 // @ts-ignore 
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-// END: Import Leaflet and API
+// END: Import Leaflet, new MapStore and types
 
-// Interface for Scooter data needed by map
-interface HomeScooter {
-    id: number;
-    status: string;
-    isAvailable: boolean;
-    batteryLevel: number;
-    location: string;
-    latitude?: number | null;
-    longitude?: number | null;
-}
+// Remove or comment out old HomeScooter interface
+// interface HomeScooter { ... }
 
 // --- START: Map and Location State ---
 const mapInstance = ref<L.Map | null>(null);
-const scooterMarkersLayer = ref<L.LayerGroup | null>(null);
+const markersLayer = ref<L.LayerGroup | null>(null); // Rename scooterMarkersLayer
 const userMarker = ref<L.Marker | null>(null);
-const homeScooters = ref<HomeScooter[]>([]);
-const isLoadingMap = ref(true);
-const mapError = ref<string | null>(null);
+const selectedStoreMarker = ref<L.Marker | null>(null);
+const isDirectMapAccess = ref(false); // 标记是否是直接从站点列表访问地图
+
+// 使用route获取查询参数
+const route = useRoute();
+
+// Use the map store
+const mapStore = useMapStore();
+const { mapItems, isLoading: isLoadingMap, error: mapError } = storeToRefs(mapStore); // Get state from map store
 
 // Define a fixed virtual user location (e.g., near SWJTU South Gate)
-// Slightly adjusted coordinates to reduce overlap chance
 const virtualUserLocation = L.latLng(30.7488, 103.9783);
 
 // Define Scooter Icon (Emoji)
 const scooterDivIcon = L.divIcon({
     html: '🛴', 
-    className: 'leaflet-emoji-icon', 
+    className: 'leaflet-emoji-icon scooter-icon', // Add specific class
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+    popupAnchor: [0, -30]
+});
+
+// Define Store Icon (Emoji)
+const storeDivIcon = L.divIcon({
+    html: '🏢', // Building emoji
+    className: 'leaflet-emoji-icon store-icon', // Add specific class
     iconSize: [30, 30], 
     iconAnchor: [15, 30],
     popupAnchor: [0, -30]
 });
 
+// Define Selected Store Icon (Highlighted)
+const selectedStoreDivIcon = L.divIcon({
+    html: '🏪', // Store emoji (different from regular store)
+    className: 'leaflet-emoji-icon selected-store-icon', // Add specific class
+    iconSize: [40, 40], // Larger size
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+});
+
 // Define User Icon (Emoji)
 const userDivIcon = L.divIcon({
     html: '📍', // Location pin emoji
-    className: 'leaflet-user-icon', // Custom class for styling
+    className: 'leaflet-user-icon',
     iconSize: [30, 30],
     iconAnchor: [15, 30],
     popupAnchor: [0, -30]
@@ -102,96 +118,297 @@ const logout = () => {
   router.push('/login')
 }
 
+// 重置选定的站点和地图状态
+const resetSelectedStore = () => {
+  // 移除之前的标记（如果有）
+  if (selectedStoreMarker.value) {
+    selectedStoreMarker.value.remove();
+    selectedStoreMarker.value = null;
+  }
+  
+  // 清除localStorage中的站点数据
+  localStorage.removeItem('selectedStoreToView');
+  
+  // 重置地图视图（如果已经加载）
+  if (mapInstance.value && markersLayer.value) {
+    const validCoords: L.LatLngExpression[] = [virtualUserLocation];
+    
+    // 收集所有有效的坐标
+    mapItems.value.forEach(item => {
+      if (item.latitude != null && item.longitude != null && !isNaN(item.latitude) && !isNaN(item.longitude)) {
+        validCoords.push([item.latitude, item.longitude]);
+      }
+    });
+    
+    // 调整地图视图
+    if (validCoords.length > 1) {
+      try {
+        mapInstance.value.flyToBounds(L.latLngBounds(validCoords), { padding: [50, 50] });
+      } catch(e) {
+        console.error("Error adjusting map bounds:", e);
+      }
+    }
+  }
+};
+
 // --- START: Map Functions ---
 const initMap = () => {
     if (mapInstance.value) return; // Already initialized
     try {
-        mapInstance.value = L.map('home-map').setView(virtualUserLocation, 14); // Center on user
+        const map = L.map('home-map').setView(virtualUserLocation, 14); // Create map instance first
+        mapInstance.value = map; // Assign to ref
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(mapInstance.value);
+        }).addTo(map); // Add tile layer to the map instance
 
-        scooterMarkersLayer.value = L.layerGroup().addTo(mapInstance.value);
+        // Create layer group
+        const layerGroup = L.layerGroup();
+        layerGroup.addTo(map); // Add layer group to the map instance
+        markersLayer.value = layerGroup; // Assign to ref
         
-        // Add user marker
-        userMarker.value = L.marker(virtualUserLocation, { icon: userDivIcon })
-            .addTo(mapInstance.value)
+        // Create user marker
+        const userMarkerInstance = L.marker(virtualUserLocation, { icon: userDivIcon })
             .bindPopup("Your approximate location");
+        userMarkerInstance.addTo(map); // Add user marker to the map instance
+        userMarker.value = userMarkerInstance; // Assign to ref
 
+        // 检查URL查询参数以确定是否需要显示特定站点
+        checkForSelectedStore();
     } catch (error) {
         console.error("Failed to initialize map:", error);
-        mapError.value = "Could not load the map.";
+        // Error ref is now from mapStore
     }
+};
+
+// 检查是否有选中的站点需要显示
+const checkForSelectedStore = () => {
+    // 先检查是否应该显示详情
+    if (!isDirectMapAccess.value) {
+        // 如果不是直接从站点列表访问地图，则返回
+        return;
+    }
+    
+    // 先检查URL参数
+    const showStoreId = route.query.showStore as string;
+    const lat = route.query.lat as string;
+    const lng = route.query.lng as string;
+    
+    if (showStoreId && lat && lng) {
+        const storePosition = L.latLng(parseFloat(lat), parseFloat(lng));
+        focusOnSelectedStore(parseInt(showStoreId), storePosition);
+        return;
+    }
+    
+    // 如果URL没有参数，检查localStorage
+    const storedData = localStorage.getItem('selectedStoreToView');
+    if (storedData) {
+        try {
+            const storeData = JSON.parse(storedData);
+            const storePosition = L.latLng(storeData.latitude, storeData.longitude);
+            focusOnSelectedStore(storeData.id, storePosition, storeData.name, storeData.code);
+            // 使用后清除localStorage
+            localStorage.removeItem('selectedStoreToView');
+        } catch (error) {
+            console.error('Error parsing stored store data:', error);
+        }
+    }
+};
+
+// 聚焦并显示选中的站点
+const focusOnSelectedStore = (storeId: number, position: L.LatLng, storeName?: string, storeCode?: string) => {
+    if (!mapInstance.value) return;
+    
+    // 移除之前的标记（如果有）
+    if (selectedStoreMarker.value) {
+        selectedStoreMarker.value.remove();
+    }
+    
+    // 查找地图项目中的完整店铺信息
+    const storeItem = mapItems.value.find(item => 
+        item.type === 'store' && item.id === storeId
+    ) as StoreMapItem | undefined;
+    
+    // 准备弹出内容
+    let popupContent = '';
+    if (storeItem) {
+        // 使用地图项目中的详细信息
+        popupContent = `<b>Store: ${storeItem.name} (${storeItem.code})</b><br>Status: ${storeItem.status}<br>Available Scooters: ${storeItem.availableScooterCount}`;
+        if(storeItem.address) {
+            popupContent += `<br>Address: ${storeItem.address}`;
+        }
+    } else if (storeName && storeCode) {
+        // 使用传递的基本信息
+        popupContent = `<b>Store: ${storeName} (${storeCode})</b>`;
+    } else {
+        popupContent = `<b>Store #${storeId}</b>`;
+    }
+    
+    // 创建高亮标记
+    const marker = L.marker(position, { icon: selectedStoreDivIcon });
+    
+    // 使用类型断言解决TypeScript错误
+    (marker.addTo(mapInstance.value as any) as L.Marker)
+        .bindPopup(popupContent)
+        .openPopup();
+    
+    selectedStoreMarker.value = marker;
+    
+    // 放大到这个位置
+    mapInstance.value.flyTo(position, 16);
 };
 
 const updateMapMarkers = () => {
-    if (!mapInstance.value || !scooterMarkersLayer.value) return;
+    if (!mapInstance.value || !markersLayer.value) return;
 
-    scooterMarkersLayer.value.clearLayers();
+    markersLayer.value.clearLayers();
     const validCoords: L.LatLngExpression[] = [virtualUserLocation]; // Include user location
 
-    homeScooters.value.forEach(scooter => {
-        if (scooter.latitude != null && scooter.longitude != null && !isNaN(scooter.latitude) && !isNaN(scooter.longitude)) {
+    // Use mapItems from the store
+    mapItems.value.forEach(item => {
+        if (item.latitude != null && item.longitude != null && !isNaN(item.latitude) && !isNaN(item.longitude)) {
             
-            const coords: L.LatLngExpression = [scooter.latitude, scooter.longitude];
+            const coords: L.LatLngExpression = [item.latitude, item.longitude];
             validCoords.push(coords);
             
-            const marker = L.marker(coords, { icon: scooterDivIcon });
-            
-            // Determine display status based on the boolean isAvailable flag
-            const displayStatus = scooter.isAvailable === true ? 'Available' : 'Unavailable'; // Use isAvailable
+            let marker: L.Marker;
+            let popupContent: string;
 
-            marker.bindPopup(`<b>Scooter #${scooter.id}</b><br>Status: ${displayStatus}<br>Battery: ${scooter.batteryLevel != null ? scooter.batteryLevel + '%' : 'N/A'}`);
-            scooterMarkersLayer.value?.addLayer(marker);
+            if (item.type === 'scooter') {
+                const scooter = item as ScooterMapItem;
+                marker = L.marker(coords, { icon: scooterDivIcon });
+                const displayStatus = scooter.status; // Use status directly
+                popupContent = `<b>Scooter #${scooter.id} (${scooter.model || 'N/A'})</b><br>Status: ${displayStatus}<br>Battery: ${scooter.batteryLevel != null ? scooter.batteryLevel + '%' : 'N/A'}`;
+                 // Add Book button if available and logged in
+                 if (scooter.status === 'Available' && isLoggedIn.value) {
+                    popupContent += `<br><button class="map-book-button" data-scooter-id="${scooter.id}">Book Now</button>`;
+                }
+            } else if (item.type === 'store') {
+                const store = item as StoreMapItem;
+                marker = L.marker(coords, { icon: storeDivIcon });
+                popupContent = `<b>Store: ${store.name} (${store.code})</b><br>Status: ${store.status}<br>Available Scooters: ${store.availableScooterCount}`; 
+                 if(store.address) {
+                     popupContent += `<br>Address: ${store.address}`;
+                 }
+            } else {
+                 // Skip unknown type
+                 return;
+            }
+
+            marker.bindPopup(popupContent);
+            markersLayer.value?.addLayer(marker);
+        } else {
+             console.warn(`Map item ID ${item.id} (Type: ${item.type}) has invalid or missing coordinates.`);
         }
     });
 
-    // Adjust map view
-    if (validCoords.length > 1 && mapInstance.value) { // More than just the user marker
-         try {
-             mapInstance.value.flyToBounds(L.latLngBounds(validCoords), { padding: [50, 50] });
-         } catch(e) {
-             console.error("Error adjusting map bounds:", e);
-         }
+    // 检查是否需要显示特定站点（在加载标记后再检查）
+    nextTick(() => {
+        checkForSelectedStore();
+    });
+
+    // Adjust map view if no specific store is selected
+    if (!selectedStoreMarker.value && validCoords.length > 1 && mapInstance.value) {
+        try {
+            mapInstance.value.flyToBounds(L.latLngBounds(validCoords), { padding: [50, 50] });
+        } catch(e) {
+            console.error("Error adjusting map bounds:", e);
+        }
     }
 };
 
-const fetchHomeScooters = async () => {
-    isLoadingMap.value = true;
-    mapError.value = null;
-    try {
-        const response = await adminApi.getAllScooters(); 
-        homeScooters.value = response.data.map((s: any): HomeScooter => ({
-            id: s.id,
-            latitude: s.latitude,
-            longitude: s.longitude,
-            status: s.status,
-            batteryLevel: s.batteryLevel,
-            isAvailable: s.available,
-            location: s.location
-        }));
-        console.log('Fetched home scooters data:', homeScooters.value); // Add log to check data
+// Modify the fetch function to use the store
+const fetchMapData = async () => {
+    await mapStore.fetchMapItems(); // Call store action
+    if (!mapError.value) { // Check for errors from store
         await nextTick();
         updateMapMarkers();
-    } catch (error: any) {  
-        console.error('Error fetching scooters for home map:', error);
-        mapError.value = `Failed to load scooter locations: ${error.message || 'Unknown error'}`;
-        homeScooters.value = []; 
-    } finally {
-        isLoadingMap.value = false;
     }
 };
+
+// Add event delegation for book button clicks
+const setupMapEventListeners = () => {
+    if (!mapInstance.value) return;
+    mapInstance.value.on('popupopen', (e) => {
+        const content = e.popup.getContent();
+        if (typeof content === 'string' && content.includes('map-book-button')) {
+            const container = e.popup.getElement();
+            const button = container?.querySelector('.map-book-button');
+            if (button) {
+                button.addEventListener('click', () => {
+                    const scooterId = (button as HTMLElement).dataset.scooterId;
+                    if (scooterId) {
+                        console.log('Booking scooter:', scooterId);
+                        router.push({ name: 'booking-create', params: { scooterId } });
+                    }
+                });
+            }
+        }
+    });
+};
+
 // --- END: Map Functions ---
 
+// 检查当前路由是否有查询参数或localStorage中有站点数据，决定是否显示详情
+const checkIfDirectAccess = () => {
+    // 检查是否有查询参数
+    const hasQueryParams = route.query.showStore || localStorage.getItem('selectedStoreToView');
+    isDirectMapAccess.value = !!hasQueryParams;
+    
+    // 如果从其他页面返回（没有查询参数），重置地图状态
+    if (!hasQueryParams) {
+        resetSelectedStore();
+    }
+};
+
 onMounted(async () => {
+  // 检查是否是从站点列表直接访问
+  checkIfDirectAccess();
+  
   await nextTick();
   initMap();
   if (mapInstance.value) {
-      fetchHomeScooters();
+      fetchMapData(); // Call the updated fetch function
+      setupMapEventListeners(); // Add listener setup
   }
 });
 
+// 在组件卸载前清理
+onBeforeUnmount(() => {
+  // 如果不是通过查询参数直接访问，则清除localStorage中的站点信息
+  if (!route.query.showStore) {
+    localStorage.removeItem('selectedStoreToView');
+  }
+});
+
+// Watch for changes in mapItems to update markers
+watch(mapItems, updateMapMarkers);
+
+// 监听路由变化，以便在URL查询参数变化时更新地图
+watch(() => route.query, (newQuery, oldQuery) => {
+    // 如果新的查询参数中有showStore，则表示是从站点列表直接访问
+    if (newQuery.showStore) {
+      isDirectMapAccess.value = true;
+    } else if (oldQuery.showStore) {
+      // 如果旧的查询参数中有showStore，但新的没有，则表示已离开直接访问状态
+      isDirectMapAccess.value = false;
+      // 重置选定的站点
+      resetSelectedStore();
+    }
+    
+    if (mapInstance.value) {
+        checkForSelectedStore();
+    }
+}, { deep: true });
+
+// 监听路由路径变化（用于检测从其他页面返回主页）
+watch(() => route.path, (newPath, oldPath) => {
+    if (newPath === '/' && oldPath !== '/') {
+        // 从其他页面返回主页时，重置状态
+        isDirectMapAccess.value = false;
+        resetSelectedStore();
+    }
+}, { immediate: true });
 </script>
 
 <style scoped>
@@ -343,6 +560,7 @@ onMounted(async () => {
   overflow: hidden;
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
   max-width: 1600px;
+  position: relative; /* Needed if adding legends/controls */
 }
 
 #home-map {
@@ -373,11 +591,37 @@ onMounted(async () => {
   border: 1px solid #e74c3c;
 }
 
-.leaflet-emoji-icon, .leaflet-user-icon {
+.leaflet-emoji-icon {
   font-size: 28px;
   text-align: center;
   line-height: 30px;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.scooter-icon { /* Optional: specific styles */
+}
+.store-icon { /* Optional: specific styles */
+}
+.leaflet-user-icon {
+    font-size: 28px;
+    text-align: center;
+    line-height: 30px;
+}
+
+.map-book-button {
+    padding: 5px 10px;
+    font-size: 0.9em;
+    color: white;
+    background-color: #4CAF50; /* Green */
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 8px;
+    display: inline-block;
+    transition: background-color 0.2s;
+}
+.map-book-button:hover {
+    background-color: #45a049;
 }
 
 .features {
@@ -499,6 +743,13 @@ onMounted(async () => {
   .feature-card {
     padding: 2rem 1.5rem;
   }
+}
+
+/* 添加高亮站点的样式 */
+:deep(.selected-store-icon) {
+  font-size: 40px;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.7);
+  z-index: 1000 !important;
 }
 </style>
 

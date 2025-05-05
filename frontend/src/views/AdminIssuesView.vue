@@ -402,32 +402,36 @@ h1 {
 
 .filters {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
     margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
 }
 
-.search-box input,
+.filters .search-box,
 .filters select {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
-}
-
-.search-box input {
-    min-width: 250px;
+    flex-grow: 1;
+    min-width: 150px;
 }
 
 .table-container {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border-color, #eee);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1rem;
 }
 
 .data-table {
     width: 100%;
+    min-width: 750px; /* Adjust based on columns */
     border-collapse: collapse;
+    background-color: var(--card-bg, white);
 }
 
 .data-table th,
@@ -478,6 +482,7 @@ h1 {
 .actions-cell {
     display: flex;
     gap: 0.5rem;
+    white-space: nowrap;
 }
 
 .action-btn {
@@ -522,11 +527,12 @@ h1 {
     z-index: 9999; /* Keep high z-index */
     visibility: visible;
     opacity: 1;
+    padding: 1rem;
 }
 
 .modal-container {
-    width: 90%;
-    max-width: 700px;
+    width: 100%;
+    max-width: 700px; /* Allow wider for issue details */
     max-height: 90vh;
     background-color: white;
     border-radius: 12px;
@@ -537,7 +543,7 @@ h1 {
     z-index: 10000; /* Higher than overlay */
     visibility: visible;
     opacity: 1;
-    /* overflow: hidden; */ /* Let modal-body handle scroll */
+    margin: auto;
 }
 
 .modal-header {
@@ -566,17 +572,18 @@ h1 {
 /* Specific details styling */
 .issue-details {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.detail-section {
+    background-color: #f9fafb;
+    padding: 1rem;
+    border-radius: var(--radius-md);
 }
 
 .detail-section h4 {
-    margin: 0 0 0.75rem;
-    color: #10b981; /* Example color */
-    font-size: 1.1rem;
-    font-weight: 600;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
 }
 
 .detail-section p {
@@ -585,70 +592,140 @@ h1 {
 }
 
 .issue-description {
-    white-space: pre-wrap; /* Preserve whitespace */
-    background-color: #f8f9fa;
+    white-space: pre-wrap; /* Allow description to wrap */
+    background-color: var(--neutral-100);
     padding: 0.75rem;
-    border-radius: 6px;
-    border: 1px solid #eee;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
 }
 
 .photo-gallery {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
 }
 
 .photo-item img {
-    max-width: 150px;
-    max-height: 150px;
-    border-radius: 6px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
     object-fit: cover;
-    border: 1px solid #ddd;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color, #eee);
 }
 
 .detail-section textarea {
     width: 100%;
     padding: 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-family: inherit;
-    font-size: 0.95rem;
+    border: 1px solid var(--border-color, #eee);
+    border-radius: var(--radius-md);
+    resize: vertical;
+    min-height: 80px;
 }
 
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    margin-top: 1rem;
+.issue-details .form-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    border-top: 1px solid var(--border-color, #eee);
     padding-top: 1rem;
-    border-top: 1px solid #eee;
+    margin-top: 0.5rem;
 }
-/* --- End Modal Styles --- */
+
+/* Responsive Adjustments */
+@media (max-width: 992px) {
+    .filters {
+        padding: 0.75rem;
+    }
+    .data-table {
+        min-width: 650px;
+    }
+    .modal-container {
+        max-width: 600px;
+    }
+    .issue-details {
+        grid-template-columns: 1fr;
+    }
+}
 
 @media (max-width: 768px) {
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
     .filters {
-        flex-direction: column;
+        padding: 0.5rem;
         gap: 0.5rem;
     }
-
-    .search-box input {
-        min-width: auto;
-        width: 100%;
+    .filters .search-box input,
+    .filters select {
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
     }
 
+    .table-container {
+        margin-bottom: 1rem;
+    }
+    .data-table {
+        min-width: 550px;
+    }
     .data-table th,
     .data-table td {
-        padding: 0.75rem 0.5rem;
-        font-size: 0.875rem;
+        padding: 0.6rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+    }
+    .actions-cell .action-btn {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.75rem;
+        margin-right: 0.25rem;
     }
 
-    .actions-cell {
+    .modal-header h3 {
+        font-size: 1.1rem;
+    }
+    .modal-body {
+        padding: 1rem;
+    }
+    .issue-details {
+        gap: 1rem;
+    }
+    .detail-section {
+        padding: 0.75rem;
+    }
+    .detail-section h4 {
+        font-size: 1rem;
+    }
+    .detail-section p {
+        font-size: 0.9rem;
+    }
+    .photo-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 0.5rem;
+    }
+    .form-actions {
+        padding: 0.75rem;
+        gap: 0.5rem;
+    }
+    .form-actions button {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .filters {
         flex-direction: column;
-        gap: 0.25rem;
+        align-items: stretch;
     }
-
-    .action-btn {
-        width: 100%;
+    .filters .search-box,
+    .filters select {
+        min-width: 100%;
+    }
+    .data-table th,
+    .data-table td {
+        white-space: nowrap;
     }
 }
 </style>

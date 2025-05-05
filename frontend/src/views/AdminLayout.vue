@@ -73,9 +73,31 @@ import AdminNavbar from '../components/AdminNavbar.vue'
     overflow-y: auto;
 }
 
+/* Responsive adjustments */
+@media (max-width: 992px) { /* Adjust breakpoint if needed */
+    /* Potential styles if sidebar width changes */
+}
+
 @media (max-width: 768px) {
+    .admin-layout {
+        flex-direction: column; /* Stack sidebar and content */
+    }
+
+    .admin-sidebar {
+        position: relative; /* Unstick for stacking */
+        height: auto;      /* Adjust height */
+        width: 100%;       /* Full width when stacked */
+        /* Add box-shadow or border if needed for separation */
+        border-bottom: 1px solid var(--border-color, #eee);
+    }
+
+    .admin-content {
+        /* No specific changes needed here if sidebar stacks above */
+    }
+
     .admin-header {
         padding: 0 1rem;
+        /* Consider adding a menu toggle button here if needed */
     }
 
     .admin-main {

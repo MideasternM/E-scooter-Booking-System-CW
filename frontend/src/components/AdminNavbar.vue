@@ -70,6 +70,13 @@
                         <span class="nav-text">Pricing</span>
                     </div>
                 </RouterLink>
+                
+                <RouterLink to="/admin/rental-stores" class="nav-item" v-slot="{ isActive }">
+                    <div class="nav-link" :class="{ 'active': isActive }">
+                        <span class="nav-icon">🏪</span>
+                        <span class="nav-text">Rental Stores</span>
+                    </div>
+                </RouterLink>
             </div>
             
             <div class="navbar-footer">
@@ -97,7 +104,7 @@ const toggleMobileMenu = () => {
 }
 
 const logout = () => {
-    authStore.logout()
+    authStore.adminLogout()
     router.push('/admin/login')
 }
 </script>
@@ -211,6 +218,8 @@ const logout = () => {
     flex: 1;
     overflow-y: auto;
     padding-bottom: 1rem;
+    transition: transform var(--transition-normal) var(--easing-standard), 
+                opacity var(--transition-normal) var(--easing-standard);
 }
 
 .navbar-user {
@@ -316,9 +325,8 @@ const logout = () => {
 }
 
 .navbar-footer {
-    padding: 1rem 1.25rem;
     margin-top: auto;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0 1rem;
 }
 
 .logout-button {
@@ -335,6 +343,7 @@ const logout = () => {
     cursor: pointer;
     text-align: left;
     transition: all var(--transition-fast);
+    margin-top: 1rem;
 }
 
 .logout-button:hover {
@@ -349,12 +358,10 @@ const logout = () => {
 
 @media (max-width: 768px) {
     .admin-navbar {
+        position: relative;
         width: 100%;
         height: auto;
-        min-height: 0;
-        position: sticky;
-        top: 4.5rem;
-        z-index: 800;
+        z-index: 1000;
     }
     
     .navbar-brand {
@@ -368,28 +375,64 @@ const logout = () => {
     
     .navbar-container {
         position: absolute;
-        top: 100%;
+        top: 4.5rem;
         left: 0;
-        width: 100%;
+        right: 0;
         background: linear-gradient(180deg, var(--primary-900) 0%, var(--primary-800) 100%);
+        z-index: 999;
+        max-height: calc(100vh - 4.5rem);
+        overflow-y: auto;
+        padding: 1rem 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
         box-shadow: var(--shadow-lg);
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.3s ease-out;
-        z-index: 799;
+        transform: translateY(-100%);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: transform var(--transition-normal) var(--easing-standard),
+                    opacity var(--transition-normal) var(--easing-standard),
+                    visibility 0s var(--transition-normal);
     }
     
     .navbar-container.mobile-open {
-        max-height: calc(100vh - 4.5rem - 3.5rem);
-        overflow-y: auto;
+        transform: translateY(0);
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition: transform var(--transition-normal) var(--easing-standard),
+                    opacity var(--transition-normal) var(--easing-standard),
+                    visibility 0s 0s;
     }
     
     .navbar-user {
-        margin: 0.75rem;
+        margin: 0 1rem 1rem 1rem;
+    }
+    
+    .navbar-links {
+        padding: 0;
+    }
+    
+    .nav-item {
+        margin: 0;
     }
     
     .nav-link {
-        padding: 0.75rem 1rem;
+        padding: 0.8rem 1.5rem;
+        border-radius: 0;
+    }
+    
+    .nav-link.active {
+        background-color: rgba(255, 255, 255, 0.15);
+        border-left: none;
+        box-shadow: none;
+    }
+    
+    .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+    }
+    
+    .navbar-footer {
+        padding: 1rem;
     }
 }
 

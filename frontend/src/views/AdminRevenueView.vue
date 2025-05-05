@@ -264,7 +264,7 @@ h1 {
 .daily-income-list {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 0.75rem;
+    gap: 1rem;
     padding: 1rem 0;
 }
 
@@ -287,7 +287,7 @@ h1 {
 .popularity-list {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 0.75rem;
+    gap: 1rem;
     padding: 1rem 0;
 }
 
@@ -310,5 +310,77 @@ h1 {
     font-size: 1.1rem;
     font-weight: 600;
     color: #42b983;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 992px) {
+    .income-breakdown {
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 0.75rem;
+    }
+    .daily-income-list {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 0.75rem;
+    }
+    .popularity-list {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.75rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .admin-revenue-view {
+        padding: 1rem;
+    }
+    h1 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .section-card {
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .section-card h2 {
+        font-size: 1.2rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .income-breakdown,
+    .daily-income-list,
+    .popularity-list {
+        gap: 0.5rem;
+        padding: 0.75rem 0;
+    }
+
+    .income-item,
+    .day-item,
+    .popularity-item {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
+
+    .income-item .label,
+    .day-item strong,
+    .popularity-item .label {
+        font-size: 0.8rem;
+    }
+
+    .income-item .value,
+    .day-item,
+    .popularity-item .value {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .income-breakdown {
+        grid-template-columns: 1fr 1fr; /* Two columns on mobile */
+    }
+    .daily-income-list {
+        grid-template-columns: 1fr 1fr; /* Two columns on mobile */
+    }
+    .popularity-list {
+        grid-template-columns: 1fr; /* Single column on mobile */
+    }
 }
 </style> 

@@ -39,6 +39,13 @@ const isAdminRoute = computed(() => {
               </div>
             </RouterLink>
             
+            <RouterLink to="/rental-stores" class="nav-link" v-slot="{ isActive }">
+              <div class="nav-link-inner" :class="{ 'active': isActive }">
+                <span class="nav-icon">🏪</span>
+                <span class="nav-text">Stores</span>
+              </div>
+            </RouterLink>
+            
             <RouterLink v-if="isLoggedIn" to="/bookings" class="nav-link" v-slot="{ isActive }">
               <div class="nav-link-inner" :class="{ 'active': isActive }">
                 <span class="nav-icon">📋</span>

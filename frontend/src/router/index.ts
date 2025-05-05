@@ -24,6 +24,11 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('../views/ScooterListView.vue')
   },
   {
+    path: '/rental-stores',
+    name: 'rental-stores',
+    component: () => import('../views/RentalStoreListView.vue')
+  },
+  {
     path: '/bookings',
     name: 'bookings',
     component: () => import('../views/BookingListView.vue')
@@ -99,6 +104,12 @@ const routes: Array<RouteRecordRaw> = [
         path: 'pricing',
         name: 'admin-pricing',
         component: AdminPricingView,
+        meta: { requiresAdmin: true }
+      },
+      {
+        path: 'rental-stores',
+        name: 'admin-rental-stores',
+        component: () => import('../views/AdminRentalStoreListView.vue'),
         meta: { requiresAdmin: true }
       },
       {

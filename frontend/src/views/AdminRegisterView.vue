@@ -202,4 +202,28 @@ select:focus {
 .links a:hover {
     text-decoration: underline;
 }
+
+/* Responsive Adjustments */
+@media (max-width: 480px) {
+    .register-box {
+        padding: 1.5rem;
+        margin: 0 1rem; /* Add some horizontal margin */
+    }
+    h2 {
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    input,
+    select {
+        padding: 0.7rem;
+        font-size: 0.95rem;
+    }
+    .register-button {
+        padding: 0.7rem;
+        font-size: 0.95rem;
+    }
+}
 </style>

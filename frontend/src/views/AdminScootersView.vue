@@ -119,8 +119,22 @@
                             <input v-model="newScooterForm.batteryLevel" type="number" min="0" max="100" required />
                         </div>
                         <div class="form-group">
+                            <label>Latitude:</label>
+                            <input v-model="newScooterForm.latitude" type="number" step="0.000001" required placeholder="e.g. 40.7128" @change="handleNewScooterCoordinateChange" />
+                        </div>
+                        <div class="form-group">
+                            <label>Longitude:</label>
+                            <input v-model="newScooterForm.longitude" type="number" step="0.000001" required placeholder="e.g. -74.0060" @change="handleNewScooterCoordinateChange" />
+                        </div>
+                        <div class="form-group">
                             <label>Location:</label>
-                            <input v-model="newScooterForm.location" type="text" required />
+                            <div class="location-input-group">
+                                <input v-model="newScooterForm.location" type="text" required />
+                                <button type="button" class="location-btn" @click="getNewScooterLocationFromCoordinates" :disabled="isNewLocationLoading">
+                                    {{ isNewLocationLoading ? 'Loading...' : 'Get from Coordinates' }}
+                                </button>
+                            </div>
+                            <small v-if="newLocationError" class="error-text">{{ newLocationError }}</small>
                         </div>
                         <div class="form-group">
                             <label>Last Maintenance:</label>
@@ -145,6 +159,10 @@
                 <div class="modal-body">
                     <form v-if="editingScooter" @submit.prevent="updateScooter">
                         <div class="form-group">
+                            <label>Model:</label>
+                            <input v-model="editScooterForm.model" type="text" placeholder="e.g. Standard, Premium, etc." />
+                        </div>
+                        <div class="form-group">
                             <label>Status:</label>
                             <select v-model="editScooterForm.status" required>
                                 <option value="Available">Available</option>
@@ -158,7 +176,21 @@
                         </div>
                         <div class="form-group">
                             <label>Location:</label>
-                            <input v-model="editScooterForm.location" type="text" required />
+                            <div class="location-input-group">
+                                <input v-model="editScooterForm.location" type="text" required />
+                                <button type="button" class="location-btn" @click="getLocationFromCoordinates" :disabled="isLocationLoading">
+                                    {{ isLocationLoading ? 'Loading...' : 'Get from Coordinates' }}
+                                </button>
+                            </div>
+                            <small v-if="locationError" class="error-text">{{ locationError }}</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Latitude:</label>
+                            <input v-model="editScooterForm.latitude" type="number" step="0.000001" required placeholder="e.g. 40.7128" @change="handleCoordinateChange" />
+                        </div>
+                        <div class="form-group">
+                            <label>Longitude:</label>
+                            <input v-model="editScooterForm.longitude" type="number" step="0.000001" required placeholder="e.g. -74.0060" @change="handleCoordinateChange" />
                         </div>
                         <div class="form-group">
                             <label>Last Maintenance:</label>
@@ -238,7 +270,7 @@
 <script setup lang="ts">
 // Import necessary functions and types
 import { ref, computed, onMounted, reactive, watch, nextTick } from 'vue'
-import { adminApi } from '../services/api'
+import { adminApi, api } from '../services/api'
 import { parseISO, format as formatDateFn, isValid as isDateValid } from 'date-fns'
 // Change Leaflet import back to default import and ignore TS error
 // @ts-ignore 
@@ -290,6 +322,8 @@ interface ScooterForm {
     status: string;
     batteryLevel: number;
     location: string;
+    latitude?: number | null;
+    longitude?: number | null;
     lastMaintenance: string; // YYYY-MM-DD format for input type=date
 }
 
@@ -322,11 +356,13 @@ const showGuestBookingModal = ref(false)
 // Form data - Use reactive for objects
 const newScooterForm = reactive<ScooterForm>({
     scooterCode: '',
-    model: '',
+    model: 'Standard',
     status: 'Available',
     batteryLevel: 100,
     location: '',
-    lastMaintenance: new Date().toISOString().split('T')[0] // Default to today
+    latitude: 0,
+    longitude: 0,
+    lastMaintenance: new Date().toISOString().split('T')[0] // Current date in YYYY-MM-DD
 })
 
 const editScooterForm = reactive<ScooterForm>({
@@ -356,6 +392,14 @@ const guestBookingError = ref<string | null>(null)
 const mapInstance = ref<L.Map | null>(null)
 const scooterMarkersLayer = ref<L.LayerGroup | null>(null)
 
+// 添加地理编码相关的状态变量
+const isLocationLoading = ref(false)
+const locationError = ref<string | null>(null)
+
+// 添加用于新滑板车表单的地理编码状态
+const isNewLocationLoading = ref(false)
+const newLocationError = ref<string | null>(null)
+
 // Helper function to format Date to YYYY-MM-DD
 const formatDateToInput = (date: Date | null): string => {
     if (!date || isNaN(date.getTime())) return ''
@@ -371,10 +415,12 @@ watch(editingScooter, (newVal) => {
         editScooterForm.status = newVal.status
         editScooterForm.batteryLevel = newVal.batteryLevel
         editScooterForm.location = newVal.location
+        editScooterForm.latitude = newVal.latitude || 0
+        editScooterForm.longitude = newVal.longitude || 0
         editScooterForm.lastMaintenance = formatDateToInput(newVal.lastMaintenanceDate)
     } else {
         // Reset form if needed
-        Object.assign(editScooterForm, { id: null, scooterCode: '', model: '', status: '', batteryLevel: 0, location: '', lastMaintenance: '' })
+        Object.assign(editScooterForm, { id: null, scooterCode: '', model: '', status: '', batteryLevel: 0, location: '', latitude: 0, longitude: 0, lastMaintenance: '' })
     }
 })
 
@@ -422,6 +468,7 @@ const fetchScooters = async () => {
     apiError.value = null
     try {
         const response = await adminApi.getAllScooters()
+        console.log('Received scooters from API:', response.data) // Add debugging log
         scooters.value = response.data.map((raw: ApiScooterResponse): ProcessedScooter => {
             let parsedDate: Date | null = null
             try { parsedDate = raw.lastMaintenance ? parseISO(raw.lastMaintenance) : null } catch(e) { console.error("Error parsing lastMaintenance:", raw.lastMaintenance, e) }
@@ -429,7 +476,7 @@ const fetchScooters = async () => {
             // Determine status (handle potential 'available' field)
             let status = raw.status || 'Unknown'
             if(raw.available === true && status === 'Unknown') status = 'Available'
-            if(raw.available === false && status === 'Unknown') status = 'In Use' // Assumption
+            if(raw.available === false && status === 'Unknown') status = 'Maintenance' // Changed from 'In Use' to 'Maintenance'
 
             return {
                 id: raw.id,
@@ -439,8 +486,8 @@ const fetchScooters = async () => {
                 batteryLevel: raw.batteryLevel,
                 location: raw.location,
                 lastMaintenanceDate: parsedDate,
-                latitude: raw.latitude,
-                longitude: raw.longitude
+                latitude: raw.latitude !== undefined ? raw.latitude : null,
+                longitude: raw.longitude !== undefined ? raw.longitude : null
             }
         })
         updateMapMarkers()
@@ -455,14 +502,15 @@ const fetchScooters = async () => {
 
 const addScooter = async () => {
     try {
-        // Convert form data back to API format if needed (e.g., date string)
-        // Explicitly create the payload without the ID
+        // Prepare data for API submission
         const apiData: Omit<ScooterForm, 'id'> = {
             scooterCode: newScooterForm.scooterCode,
             model: newScooterForm.model,
             status: newScooterForm.status,
             batteryLevel: newScooterForm.batteryLevel,
             location: newScooterForm.location,
+            latitude: newScooterForm.latitude,
+            longitude: newScooterForm.longitude,
             lastMaintenance: newScooterForm.lastMaintenance
         };
         
@@ -470,7 +518,16 @@ const addScooter = async () => {
         alert('Scooter added successfully!')
         showAddModal.value = false
         // Reset form
-        Object.assign(newScooterForm, { scooterCode: '', model: '', status: 'Available', batteryLevel: 100, location: '', lastMaintenance: new Date().toISOString().split('T')[0] })
+        Object.assign(newScooterForm, { 
+            scooterCode: '', 
+            model: 'Standard', 
+            status: 'Available', 
+            batteryLevel: 100, 
+            location: '', 
+            latitude: 0, 
+            longitude: 0,
+            lastMaintenance: new Date().toISOString().split('T')[0] 
+        })
         fetchScooters() // Refresh list
     } catch (error: any) {
         console.error('Error adding scooter:', error)
@@ -483,7 +540,30 @@ const updateScooter = async () => {
     try {
         // Prepare data for API (might need adjustments based on backend)
         const apiData = { ...editScooterForm }
+        console.log('Sending scooter update data:', apiData)
+        
+        // First, update the scooter with the standard API
         await adminApi.updateScooter(editScooterForm.id, apiData)
+        
+        // Check if we need to update coordinates separately
+        if (apiData.latitude !== undefined && apiData.longitude !== undefined) {
+            try {
+                // Use the dedicated API method for coordinates
+                await adminApi.updateScooterCoordinates(
+                    editScooterForm.id, 
+                    Number(apiData.latitude), 
+                    Number(apiData.longitude)
+                )
+                console.log(`Updated coordinates for scooter #${editScooterForm.id} to:`, {
+                    latitude: apiData.latitude, 
+                    longitude: apiData.longitude
+                })
+            } catch (coordError) {
+                console.error('Error updating coordinates:', coordError)
+                // Don't fail the entire operation if coordinates update fails
+            }
+        }
+        
         alert('Scooter updated successfully!')
         showEditModal.value = false
         editingScooter.value = null // Clear selection
@@ -512,13 +592,10 @@ const toggleMaintenance = async (scooter: ProcessedScooter) => {
     const newStatus = scooter.status === 'Maintenance' ? 'Available' : 'Maintenance'
     try {
         await adminApi.updateScooterStatus(scooter.id, newStatus)
-        // Update local state immediately for better UX
-        const index = scooters.value.findIndex(s => s.id === scooter.id)
-        if (index !== -1) {
-            scooters.value[index].status = newStatus
-        }
-        updateMapMarkers()
+        // 不在此处更新本地状态，而是通过fetchScooters完全刷新数据
         alert(`Scooter status updated to ${newStatus}.`)
+        // 重新获取所有滑板车数据，确保获取到正确的状态
+        await fetchScooters()
     } catch (error: any) {
         console.error('Error updating scooter status:', error)
         alert(`Failed to update status: ${error.response?.data?.message || error.message}`)
@@ -672,6 +749,106 @@ const isValidGuestBookingForm = computed(() => {
     return isValidEmail(guestBookingForm.guestEmail) && guestBookingForm.selectedDurationLabel !== '';
 });
 
+// 添加一个通用的反向地理编码函数
+const reverseGeocode = async (lat: number, lng: number): Promise<string | null> => {
+    try {
+        // 使用OpenStreetMap的Nominatim服务进行反向地理编码
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+            headers: {
+                'Accept-Language': 'en-US,en', // 请求英文结果
+                'User-Agent': 'E-Scooter-Booking-System' // 按Nominatim API要求提供应用名称
+            }
+        })
+        
+        if (!response.ok) {
+            throw new Error(`Geocoding failed with status: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        
+        if (data && data.display_name) {
+            // 获取到了地址，返回处理后的地址
+            const addressParts = data.display_name.split(',')
+            // 取地址的前几部分作为location值，避免过长
+            return addressParts.slice(0, 3).join(', ')
+        }
+        return null
+    } catch (error) {
+        console.error('Error in reverseGeocode:', error)
+        throw error
+    }
+}
+
+// 现有滑板车的地理编码功能
+const getLocationFromCoordinates = async () => {
+    // 检查是否有有效的经纬度
+    const lat = Number(editScooterForm.latitude)
+    const lng = Number(editScooterForm.longitude)
+    
+    if (isNaN(lat) || isNaN(lng) || !lat || !lng) {
+        locationError.value = 'Please enter valid latitude and longitude values'
+        return
+    }
+    
+    isLocationLoading.value = true
+    locationError.value = null
+    
+    try {
+        const locationValue = await reverseGeocode(lat, lng)
+        if (locationValue) {
+            editScooterForm.location = locationValue
+            console.log('Location set from coordinates:', locationValue)
+        } else {
+            locationError.value = 'No address found for these coordinates'
+        }
+    } catch (error: any) {
+        console.error('Error fetching location data:', error)
+        locationError.value = error.message || 'Failed to get location from coordinates'
+    } finally {
+        isLocationLoading.value = false
+    }
+}
+
+// 新滑板车的地理编码功能
+const getNewScooterLocationFromCoordinates = async () => {
+    // 检查是否有有效的经纬度
+    const lat = Number(newScooterForm.latitude)
+    const lng = Number(newScooterForm.longitude)
+    
+    if (isNaN(lat) || isNaN(lng) || !lat || !lng) {
+        newLocationError.value = 'Please enter valid latitude and longitude values'
+        return
+    }
+    
+    isNewLocationLoading.value = true
+    newLocationError.value = null
+    
+    try {
+        const locationValue = await reverseGeocode(lat, lng)
+        if (locationValue) {
+            newScooterForm.location = locationValue
+            console.log('New scooter location set from coordinates:', locationValue)
+        } else {
+            newLocationError.value = 'No address found for these coordinates'
+        }
+    } catch (error: any) {
+        console.error('Error fetching location data for new scooter:', error)
+        newLocationError.value = error.message || 'Failed to get location from coordinates'
+    } finally {
+        isNewLocationLoading.value = false
+    }
+}
+
+// 坐标变化时清除错误
+const handleCoordinateChange = () => {
+    locationError.value = null
+}
+
+// 新滑板车坐标变化处理程序
+const handleNewScooterCoordinateChange = () => {
+    newLocationError.value = null
+}
+
 // Lifecycle hook
 onMounted(async () => {
     await nextTick();
@@ -705,25 +882,49 @@ watch(scooters, updateMapMarkers, { deep: true });
 
 .filters {
     display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
+    flex-wrap: wrap; /* Allow filters to wrap */
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
 }
 
-.search-box input,
+.filters .search-box,
 .filters select {
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    flex-grow: 1; /* Allow elements to grow */
+    min-width: 150px; /* Minimum width before wrapping */
+}
+
+.map-container {
+    height: 400px; /* Adjust as needed */
+    margin-bottom: 1.5rem;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+}
+
+#scooter-map {
+    height: 100%;
+    width: 100%;
+    z-index: 1; /* Ensure map is below modals */
 }
 
 .table-container {
+    width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border-color, #eee);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
 }
 
 .data-table {
     width: 100%;
+    min-width: 800px; /* Adjust based on columns */
     border-collapse: collapse;
-    margin-top: 20px;
+    background-color: var(--card-bg, white);
 }
 
 .data-table th,
@@ -788,6 +989,7 @@ watch(scooters, updateMapMarkers, { deep: true });
 .actions-cell {
     display: flex;
     gap: 8px;
+    white-space: nowrap; /* Prevent action buttons from wrapping */
 }
 
 .action-btn {
@@ -818,6 +1020,13 @@ watch(scooters, updateMapMarkers, { deep: true });
     color: white;
 }
 
+.actions-cell .action-btn {
+    margin-right: 0.5rem;
+}
+.actions-cell .action-btn:last-child {
+    margin-right: 0;
+}
+
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -828,14 +1037,15 @@ watch(scooters, updateMapMarkers, { deep: true });
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 9999; /* Keep high z-index */
+    z-index: 1050; /* Ensure modals are above map */
     visibility: visible;
     opacity: 1;
+    padding: 1rem;
 }
 
 .modal-container {
-    width: 90%;
-    max-width: 550px; /* Standard width for forms */
+    width: 100%; /* Full width on small screens */
+    max-width: 500px;
     max-height: 90vh;
     background-color: white;
     border-radius: 12px;
@@ -846,7 +1056,7 @@ watch(scooters, updateMapMarkers, { deep: true });
     z-index: 10000; /* Higher than overlay */
     visibility: visible;
     opacity: 1;
-    /* overflow: hidden; */ /* Let modal-body handle scroll */
+    margin: auto;
 }
 
 .modal-header {
@@ -1013,30 +1223,115 @@ watch(scooters, updateMapMarkers, { deep: true });
    color: #333;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 992px) {
     .filters {
+        padding: 0.75rem;
+    }
+    .map-container {
+        height: 350px;
+    }
+    .data-table {
+        min-width: 700px;
+    }
+}
+
+@media (max-width: 768px) {
+    .page-header {
         flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
+    .page-header .add-button {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.8rem;
+    }
+    
+    .filters {
+        padding: 0.5rem;
         gap: 0.5rem;
     }
 
-    .search-box input {
-        min-width: auto;
-        width: 100%;
+    .filters .search-box input,
+    .filters select {
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
     }
 
+    .map-container {
+        height: 300px;
+        margin-bottom: 1rem;
+    }
+
+    .table-container {
+        margin-bottom: 1rem;
+    }
+    .data-table {
+        min-width: 600px; /* Further reduce min-width if needed */
+    }
     .data-table th,
     .data-table td {
-        padding: 0.75rem 0.5rem;
-        font-size: 0.875rem;
+        padding: 0.6rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+    }
+    .battery-indicator span {
+        font-size: 0.8rem;
     }
 
-    .actions-cell {
-        flex-direction: column;
-        gap: 0.25rem;
+    .actions-cell .action-btn {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.75rem;
+        margin-right: 0.25rem;
     }
+    
+    .modal-header h3 {
+        font-size: 1.1rem;
+    }
+    .modal-body {
+        padding: 1rem;
+    }
+    .form-group label {
+        font-size: 0.9rem;
+    }
+    .form-group input,
+    .form-group select {
+        padding: 0.6rem;
+        font-size: 0.9rem;
+    }
+    .form-actions {
+        padding: 0.75rem;
+        gap: 0.5rem;
+    }
+    .form-actions button {
+        font-size: 0.85rem;
+    }
+    .delete-modal p {
+        font-size: 0.9rem;
+    }
+}
 
-    .action-btn {
-        width: 100%;
+@media (max-width: 576px) {
+    .filters {
+        flex-direction: column; /* Stack filters */
+        align-items: stretch;
+    }
+    .filters .search-box,
+    .filters select {
+        min-width: 100%;
+    }
+    .map-container {
+        height: 250px;
+    }
+    .data-table th,
+    .data-table td {
+        white-space: nowrap; /* Ensure horizontal scrolling works well */
     }
 }
 
@@ -1048,5 +1343,43 @@ watch(scooters, updateMapMarkers, { deep: true });
     /* Add other styles like background, border-radius if desired */
     /* background: rgba(255, 255, 255, 0.7); */
     /* border-radius: 50%; */
+}
+
+/* 在<style>部分添加 */
+.location-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.location-input-group input {
+    flex: 1;
+}
+
+.location-btn {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+}
+
+.location-btn:hover:not(:disabled) {
+    background-color: #3e8e41;
+}
+
+.location-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.error-text {
+    color: #f44336;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    display: block;
 }
 </style>

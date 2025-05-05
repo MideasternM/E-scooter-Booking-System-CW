@@ -4,18 +4,66 @@
         <div v-if="loading" class="loading">Loading scooter details...</div>
         <div v-else-if="error" class="error">{{ error }}</div>
         <div v-else-if="scooter" class="booking-form">
-            <h2>Scooter Details</h2>
-            <div class="scooter-info">
-                <p><strong>ID:</strong> #{{ scooter.id }}</p>
-                <p><strong>Location:</strong> {{ scooter.location }}</p>
-                <p><strong>Battery:</strong> {{ scooter.batteryLevel }}%</p>
-                <p><strong>Model:</strong> {{ scooter.model || 'Standard' }}</p>
-                <p><strong>Status:</strong> {{ scooter.available ? 'Available' : 'Unavailable' }}</p>
-                <img :src="scooter.imageUrl || '/placeholder-scooter.png'" alt="Scooter Image" class="scooter-image" />
+            <div class="scooter-details-section">
+                <h2 class="section-title">
+                    <span class="icon-wrapper">🛴</span>
+                    Scooter Details
+                </h2>
+                <div class="scooter-info">
+                    <div class="scooter-image-container">
+                        <img :src="scooter.imageUrl || '/placeholder-scooter.png'" alt="Scooter Image" class="scooter-image" />
+                        <div class="scooter-badge">
+                            #{{ scooter.id }}
+                        </div>
+                    </div>
+                    <div class="scooter-specs">
+                        <div class="spec-item">
+                            <div class="spec-icon">📍</div>
+                            <div class="spec-content">
+                                <div class="spec-label">Location</div>
+                                <div class="spec-value">{{ scooter.location }}</div>
+                            </div>
+                        </div>
+                        <div class="spec-item">
+                            <div class="spec-icon">🔋</div>
+                            <div class="spec-content">
+                                <div class="spec-label">Battery</div>
+                                <div class="spec-value">
+                                    <div class="battery-bar">
+                                        <div class="battery-level" :style="`width: ${scooter.batteryLevel}%`" 
+                                             :class="getBatteryClass(scooter.batteryLevel)"></div>
+                                    </div>
+                                    <span>{{ scooter.batteryLevel }}%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="spec-item">
+                            <div class="spec-icon">🏷️</div>
+                            <div class="spec-content">
+                                <div class="spec-label">Model</div>
+                                <div class="spec-value">{{ scooter.model || 'Standard' }}</div>
+                            </div>
+                        </div>
+                        <div class="spec-item">
+                            <div class="spec-icon">📊</div>
+                            <div class="spec-content">
+                                <div class="spec-label">Status</div>
+                                <div class="spec-value">
+                                    <span class="status-badge" :class="scooter.available ? 'status-available' : 'status-unavailable'">
+                                        {{ scooter.available ? 'Available' : 'Unavailable' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <form @submit.prevent="handleBookingConfirm">
-                <h2>Booking Details</h2>
+                <h2 class="section-title">
+                    <span class="icon-wrapper">📝</span>
+                    Booking Details
+                </h2>
                 <div class="form-group">
                     <label for="duration">Booking Duration:</label>
                     <select id="duration" v-model.number="bookingDurationMinutes" required class="duration-select">
@@ -23,14 +71,14 @@
                             {{ option.label }}
                         </option>
                     </select>
-                    <p v-if="bookingDurationMinutes">
-                        Estimated End Time: {{ estimatedEndTime }}
+                    <p v-if="bookingDurationMinutes" class="time-estimate">
+                        <span class="info-icon">⏱️</span> Estimated End Time: <span class="highlight">{{ estimatedEndTime }}</span>
                     </p>
                     <p v-if="bookingDurationMinutes" class="estimated-price">
-                        Estimated Price: 
-                        <span v-if="priceLoading">Calculating...</span>
+                        <span class="info-icon">💰</span> Estimated Price: 
+                        <span v-if="priceLoading" class="loading-price">Calculating...</span>
                         <span v-else-if="priceError" class="error-text">{{ priceError }}</span>
-                        <span v-else>{{ estimatedPrice }}</span>
+                        <span v-else class="highlight">{{ estimatedPrice }}</span>
                     </p>
                 </div>
 
@@ -308,6 +356,13 @@ onMounted(() => {
     };
     */
 });
+
+// 添加电池状态样式计算函数
+const getBatteryClass = (level: number): string => {
+  if (level > 70) return 'high';
+  if (level > 30) return 'medium';
+  return 'low';
+};
 </script>
 
 <style scoped>
@@ -359,42 +414,177 @@ h1 {
     padding: 0 2rem 2rem;
 }
 
+.scooter-details-section {
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.2rem;
+    font-size: 1.5rem;
+}
+
+.icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+    font-size: 1.3rem;
+}
+
 .scooter-info {
     background-color: #ffffff;
     padding: 1.5rem;
     border-radius: 12px;
-    margin-bottom: 2rem;
     border: 1px solid #eee;
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 1.5rem;
+    display: flex;
+    flex-direction: row;
+    gap: 2rem;
+    align-items: center;
 }
 
-.scooter-info p {
-    margin: 0.7rem 0;
-    color: #505a66;
-    font-size: 1.05rem;
-}
-
-.scooter-info strong {
-    color: #2c3e50;
+.scooter-image-container {
+    position: relative;
+    flex: 0 0 auto;
+    width: 240px;
 }
 
 .scooter-image {
-    grid-column: 2;
-    grid-row: span 5;
-    display: block;
-    max-width: 180px;
-    height: auto;
-    margin: 0;
+    width: 100%;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition: transform 0.3s ease;
+    object-fit: cover;
+    height: auto;
+    max-height: 240px;
 }
 
 .scooter-image:hover {
-    transform: scale(1.05);
+    transform: scale(1.03);
+}
+
+.scooter-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.scooter-specs {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.spec-item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 1.2rem;
+}
+
+.spec-icon {
+    flex: 0 0 36px;
+    font-size: 1.3rem;
+    margin-right: 10px;
+}
+
+.spec-content {
+    flex: 1;
+}
+
+.spec-label {
+    font-size: 0.9rem;
+    color: #7b8996;
+    margin-bottom: 4px;
+}
+
+.spec-value {
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.battery-bar {
+    width: 100%;
+    height: 10px;
+    background-color: #e9eef2;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    overflow: hidden;
+}
+
+.battery-level {
+    height: 100%;
+    background-color: #4caf50;
+    border-radius: 5px;
+}
+
+.battery-level.high {
+    background-color: #4caf50;
+}
+
+.battery-level.medium {
+    background-color: #ff9800;
+}
+
+.battery-level.low {
+    background-color: #f44336;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 50px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.status-available {
+    background-color: rgba(76, 175, 80, 0.1);
+    color: #4caf50;
+}
+
+.status-unavailable {
+    background-color: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+}
+
+.time-estimate, .estimated-price {
+    display: flex;
+    align-items: center;
+    margin-top: 1rem;
+    font-size: 1rem;
+    color: #505a66;
+}
+
+.info-icon {
+    margin-right: 8px;
+    font-size: 1.1rem;
+}
+
+.highlight {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+.estimated-price .highlight {
+    color: #4caf50;
+}
+
+.loading-price {
+    font-style: italic;
+    color: #7b8996;
 }
 
 form {
@@ -508,13 +698,12 @@ form {
 
 @media (max-width: 768px) {
     .scooter-info {
-        grid-template-columns: 1fr;
+        flex-direction: column;
     }
     
-    .scooter-image {
-        grid-column: 1;
-        grid-row: auto;
-        margin: 1rem auto;
+    .scooter-image-container {
+        width: 100%;
+        margin-bottom: 1.5rem;
     }
     
     h1 {

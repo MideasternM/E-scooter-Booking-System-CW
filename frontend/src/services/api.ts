@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosResponse } from 'axios';
+import type { MapItem } from '../types/MapItem'; // Import the new types
 
 // --- ADD INTERFACE DEFINITIONS START ---
 // Define expected response structure for pricing
@@ -152,6 +153,14 @@ const adminApi = {
         const encodedModelName = encodeURIComponent(modelName);
         return api.put(`/api/admin/pricing/models/${encodedModelName}`, { pricePerMinute: pricePerMinute.toString() });
     },
+    // Update scooter's coordinates
+    updateScooterCoordinates: (id: number, latitude: number, longitude: number) => {
+        return api.put(`/api/scooters/${id}/coordinates`, { latitude, longitude });
+    },
+    // Update scooter's model
+    updateScooterModel: (id: number, model: string) => {
+        return api.put(`/api/scooters/${id}/model`, { model });
+    },
 }
 
 // 预约API
@@ -217,5 +226,13 @@ const pricingApi = {
     }
 };
 
-// Export the new pricingApi along with others
-export { api, adminApi, bookingApi, issueApi, paymentApi, pricingApi }
+// --- Add Map API START ---
+const mapApi = {
+    getMapItems: (): Promise<AxiosResponse<MapItem[]>> => {
+        return api.get('/api/map-items'); // Call the new backend endpoint
+    }
+};
+// --- Add Map API END ---
+
+// Export the new mapApi along with others
+export { api, adminApi, bookingApi, issueApi, paymentApi, pricingApi, mapApi }

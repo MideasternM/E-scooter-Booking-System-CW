@@ -380,8 +380,19 @@ h1 {
 
 .filters {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
     margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.filters .search-box,
+.filters select {
+    flex-grow: 1;
+    min-width: 150px;
 }
 
 .search-box input,
@@ -397,15 +408,20 @@ h1 {
 }
 
 .table-container {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border-color, #eee);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1rem;
 }
 
 .data-table {
     width: 100%;
+    min-width: 800px; /* Adjust based on columns */
     border-collapse: collapse;
+    background-color: var(--card-bg, white);
 }
 
 .data-table th,
@@ -448,6 +464,7 @@ h1 {
 .actions-cell {
     display: flex;
     gap: 0.5rem;
+    white-space: nowrap;
 }
 
 .action-btn {
@@ -487,12 +504,12 @@ h1 {
     z-index: 9999; /* Keep high z-index */
     visibility: visible;
     opacity: 1;
+    padding: 1rem;
 }
 
 .modal-container {
-    width: 90%;
-    max-width: 700px; /* Wider modal for details */
-    max-height: 90vh;
+    width: 100%;
+    max-width: 600px;
     background-color: white;
     border-radius: 12px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
@@ -502,7 +519,7 @@ h1 {
     z-index: 10000; /* Higher than overlay */
     visibility: visible;
     opacity: 1;
-    /* overflow: hidden; */ /* Let modal-body handle scroll */
+    margin: auto;
 }
 
 .modal-header {
@@ -531,8 +548,8 @@ h1 {
 /* Specific details styling */
 .booking-details {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
 }
 
 .detail-section h4 {
@@ -602,30 +619,89 @@ h1 {
 }
 /* --- End Modal Styles --- */
 
-@media (max-width: 768px) {
+@media (max-width: 992px) {
     .filters {
-        flex-direction: column;
+        padding: 0.75rem;
+    }
+    .data-table {
+        min-width: 700px;
+    }
+    .booking-details {
+        grid-template-columns: 1fr; /* Stack details */
+    }
+}
+
+@media (max-width: 768px) {
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
+    .filters {
+        padding: 0.5rem;
         gap: 0.5rem;
     }
-
-    .search-box input {
-        min-width: auto;
-        width: 100%;
+    .filters .search-box input,
+    .filters select {
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
     }
 
+    .table-container {
+        margin-bottom: 1rem;
+    }
+    .data-table {
+        min-width: 600px;
+    }
     .data-table th,
     .data-table td {
-        padding: 0.75rem 0.5rem;
-        font-size: 0.875rem;
+        padding: 0.6rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+    }
+    .actions-cell .action-btn {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.75rem;
+        margin-right: 0.25rem;
     }
 
-    .actions-cell {
+    .modal-header h3 {
+        font-size: 1.1rem;
+    }
+    .modal-body {
+        padding: 1rem;
+    }
+    .detail-section h4 {
+        font-size: 1rem;
+    }
+    .detail-section p {
+        font-size: 0.9rem;
+    }
+    .delete-modal p {
+        font-size: 0.9rem;
+    }
+    .form-actions {
+        padding: 0.75rem;
+        gap: 0.5rem;
+    }
+    .form-actions button {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .filters {
         flex-direction: column;
-        gap: 0.25rem;
+        align-items: stretch;
     }
-
-    .action-btn {
-        width: 100%;
+    .filters .search-box,
+    .filters select {
+        min-width: 100%;
+    }
+    .data-table th,
+    .data-table td {
+        white-space: nowrap;
     }
 }
 </style>

@@ -183,13 +183,16 @@ p {
 
 .pricing-table-container {
     background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border-color, #eee);
 }
 
 .data-table {
     width: 100%;
+    min-width: 500px; /* Adjust based on columns */
     border-collapse: collapse;
 }
 
@@ -216,6 +219,7 @@ p {
 .actions-cell {
     display: flex;
     gap: 0.5rem;
+    white-space: nowrap;
 }
 
 .action-btn {
@@ -254,6 +258,52 @@ p {
 .action-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .admin-pricing {
+        padding: 1rem;
+    }
+    h1 {
+        font-size: 1.5rem;
+    }
+    p {
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+    }
+    .loading-message,
+    .error-message,
+    .empty-message {
+        padding: 1rem;
+        font-size: 0.9rem;
+    }
+
+    .data-table {
+        min-width: 400px;
+    }
+    .data-table th,
+    .data-table td {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    .price-input {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.85rem;
+        max-width: 80px;
+    }
+    .actions-cell .action-btn {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 576px) {
+     /* Further adjustments if needed, e.g., stacking table cells */
+    .data-table th,
+    .data-table td {
+        white-space: nowrap;
+    }
 }
 
 </style>
