@@ -5,6 +5,7 @@ import org.example.escooter_booking_system.dto.BookingRequestDTO;
 import org.example.escooter_booking_system.dto.BookingDurationPopularityDTO;
 import org.example.escooter_booking_system.dto.BookingExtensionRequestDTO;
 import org.example.escooter_booking_system.dto.StaffBookingRequestDTO;
+import org.example.escooter_booking_system.dto.BookingUserDiscountDTO;
 import java.util.List;
 
 public interface BookingService {
@@ -33,4 +34,12 @@ public interface BookingService {
      * @return The created booking.
      */
     Booking createBookingForGuestByStaff(StaffBookingRequestDTO request);
+
+    /**
+     * Calculates the weekly usage for a user and returns discount information.
+     * 
+     * @param userId The user ID to calculate usage for
+     * @return BookingUserDiscountDTO containing usage and discount information
+     */
+    BookingUserDiscountDTO calculateWeeklyUsage(Long userId);
 }

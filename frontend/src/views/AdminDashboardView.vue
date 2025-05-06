@@ -81,7 +81,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>ID</th><th>Scooter</th><th>Reported By</th><th>Issue Type</th><th>Date</th><th>Status</th><th>Actions</th>
+                            <th>ID</th><th>Scooter</th><th>Reported By</th><th>Issue Type</th><th>Severity</th><th>Date</th><th>Status</th><th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -90,6 +90,11 @@
                             <td>Scooter #{{ issue.scooterId || 'N/A' }}</td>
                             <td>{{ issue.reportedByName || 'N/A' }}</td>
                             <td>{{ issue.issueType }}</td>
+                            <td>
+                                <span class="severity-badge" :class="(issue.severity || '').toLowerCase()">
+                                    {{ issue.severity || 'Unknown' }}
+                                </span>
+                            </td>
                             <td>{{ formatDate(issue.reportDate) }}</td>
                             <td><span class="status-badge" :class="(issue.status || '').toLowerCase().replace(' ', '-')">{{ issue.status || 'Unknown' }}</span></td>
                             <td><button class="action-btn view" @click="viewIssueDetails(issue.id)">View</button></td>
@@ -147,6 +152,11 @@
                         <div class="detail-section">
                             <h4>Issue Information</h4>
                             <p><strong>Issue Type:</strong> {{ selectedIssueForModal.issueType }}</p>
+                            <p><strong>Severity:</strong> 
+                                <span class="severity-badge" :class="(selectedIssueForModal.severity || '').toLowerCase()">
+                                    {{ selectedIssueForModal.severity || 'Unknown' }}
+                                </span>
+                            </p>
                             <p><strong>Report Date:</strong> {{ formatDateTime(selectedIssueForModal.reportDate) }}</p>
                             <p><strong>Status:</strong>
                                 <span class="status-badge" :class="(selectedIssueForModal.status || '').toLowerCase().replace(' ', '-')">
@@ -212,6 +222,7 @@ interface ApiIssue {
     scooter?: { id: number; }; 
     reportedBy?: { id: number; username?: string; name?: string; };
     faultType?: string;
+    severity?: string;
 }
 interface ProcessedBookingForDashboard {
     id: number;
@@ -232,6 +243,7 @@ interface ProcessedIssueForDashboard {
     issueType: string;
     reportDate: Date | null;
     status: string;
+    severity?: string;
 }
 // --- End Interfaces ---
 
@@ -371,7 +383,8 @@ const fetchDashboardData = async () => {
             return {
                 id: rawIssue.id, scooterId: rawIssue.scooter?.id,
                 reportedByName: rawIssue.reportedBy?.username || rawIssue.reportedBy?.name || 'Unknown',
-                issueType: rawIssue.faultType || 'Unknown Type', reportDate: parsedDate, status: rawIssue.status || 'Unknown'
+                issueType: rawIssue.faultType || 'Unknown Type', reportDate: parsedDate, status: rawIssue.status || 'Unknown',
+                severity: rawIssue.severity || 'Unknown'
             };
         });
 
@@ -752,5 +765,41 @@ h2 {
     .data-table td {
         white-space: nowrap; /* Prevent wrapping inside cells */
     }
+}
+
+/* Add severity badge styles */
+.severity-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    text-align: center;
+    min-width: 5rem;
+}
+
+.severity-badge.high {
+    background-color: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #ef4444;
+}
+
+.severity-badge.medium {
+    background-color: #fef3c7;
+    color: #d97706;
+    border: 1px solid #f59e0b;
+}
+
+.severity-badge.low {
+    background-color: #dcfce7;
+    color: #16a34a;
+    border: 1px solid #22c55e;
+}
+
+.severity-badge.unknown {
+    background-color: #e2e8f0;
+    color: #64748b;
+    border: 1px solid #94a3b8;
 }
 </style>

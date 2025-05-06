@@ -10,7 +10,7 @@
 
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
-    <div v-else class="receipt-card">
+    <div v-else-if="receipt" class="receipt-card">
       <div class="company-info">
         <h2>E-Scooter Booking System</h2>
         <p>123 Main Street</p>
@@ -35,35 +35,24 @@
 
         <div class="booking-info">
           <h3>Booking Details</h3>
-          <p><strong>Scooter ID:</strong> #{{ receipt.scooterId }}</p>
+          <p><strong>Scooter ID:</strong> #{{ receipt.scooterId || 'N/A' }}</p>
+          <p><strong>Scooter Model:</strong> {{ receipt.scooterModel || 'N/A' }}</p>
           <p><strong>Start Time:</strong> {{ formatDate(receipt.startTime) }}</p>
           <p><strong>End Time:</strong> {{ formatDate(receipt.endTime) }}</p>
-          <p><strong>Duration:</strong> {{ calculateDuration(receipt) }}</p>
-          <p><strong>Location:</strong> {{ receipt.location }}</p>
+          <p><strong>Duration:</strong> {{ receipt.durationText }}</p>
+          <p><strong>Location:</strong> {{ receipt.location || 'N/A' }}</p>
         </div>
 
         <div class="cost-breakdown">
           <h3>Cost Breakdown</h3>
           <div class="cost-table">
-            <div class="cost-row">
-              <span>Base Rate ({{ receipt.duration }} minutes)</span>
-              <span>${{ receipt.baseRate.toFixed(2) }}</span>
-            </div>
-            <div class="cost-row" v-if="receipt.additionalCharges > 0">
-              <span>Additional Charges</span>
-              <span>${{ receipt.additionalCharges.toFixed(2) }}</span>
-            </div>
-            <div class="cost-row subtotal">
-              <span>Subtotal</span>
-              <span>${{ (receipt.baseRate + receipt.additionalCharges).toFixed(2) }}</span>
-            </div>
-            <div class="cost-row tax">
-              <span>Tax ({{ (receipt.taxRate * 100).toFixed(0) }}%)</span>
-              <span>${{ calculateTax(receipt).toFixed(2) }}</span>
+            <div class="cost-row" v-if="receipt.discountApplied && receipt.discountAmount !== undefined">
+              <span>Discount Applied</span>
+              <span class="discount-value">-{{ formatAmountDisplay(receipt.discountAmount) }}</span>
             </div>
             <div class="cost-row total">
-              <span>Total</span>
-              <span>${{ calculateTotal(receipt).toFixed(2) }}</span>
+              <span>Total Amount Paid</span>
+              <span>{{ formatAmountDisplay(receipt.totalAmountPaid) }}</span>
             </div>
           </div>
         </div>
@@ -90,13 +79,14 @@
         </button>
       </div>
     </div>
+    <div v-else class="error">Could not load receipt data.</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { bookingApi, api } from '../services/api'
+import { bookingApi, api, paymentApi } from '../services/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -105,42 +95,49 @@ const loading = ref(true)
 const error = ref('')
 const receiptId = ref('')
 
-interface Receipt {
-  date: Date
-  customerName: string
-  customerEmail: string
-  scooterId: number
+interface Booking {
+  id: number
   startTime: Date
   endTime: Date
   location: string
-  duration: number
-  baseRate: number
-  additionalCharges: number
-  taxRate: number
-  paymentMethod: string
-  transactionId: string
-  paymentDate: Date
+  scooter?: { id: number; model?: string };
+  user?: { username?: string; email?: string };
+  hasDiscount?: boolean;
 }
 
-// 收据数据
-const receipt = ref<Receipt>({
-  date: new Date(),
-  customerName: '',
-  customerEmail: '',
-  scooterId: 0,
-  startTime: new Date(),
-  endTime: new Date(),
-  location: '',
-  duration: 0,
-  baseRate: 0,
-  additionalCharges: 0,
-  taxRate: 0,
-  paymentMethod: '',
-  transactionId: '',
-  paymentDate: new Date()
-})
+interface Payment {
+  id: number;
+  amount: number;
+  paymentMethod: string;
+  transactionId: string;
+  completedAt: Date | string; // Backend might send string
+  discountAmount?: number;
+  hasDiscount?: boolean;
+}
 
-// Apply the same robust date formatting as in BookingListView
+// Update Receipt interface to align with fetched data
+interface Receipt {
+  bookingId: number;
+  date: Date; // Date of receipt generation (or payment completion)
+  customerName: string;
+  customerEmail: string;
+  scooterId?: number;
+  scooterModel?: string;
+  startTime: Date | null;
+  endTime: Date | null;
+  location: string;
+  durationText: string; // Formatted duration string
+  totalAmountPaid: number;
+  paymentMethod: string;
+  transactionId: string;
+  paymentDate: Date | null;
+  discountApplied: boolean;
+  discountAmount?: number;
+}
+
+// Receipt data state
+const receipt = ref<Receipt | null>(null);
+
 const formatDate = (dateString: string | Date | null | undefined) => {
   if (!dateString) return ''; // Handle null or undefined dates gracefully
   try {
@@ -164,28 +161,31 @@ const formatDate = (dateString: string | Date | null | undefined) => {
   }
 }
 
-const calculateDuration = (receipt: Receipt) => {
-  // Ensure startTime and endTime are Date objects before calculation
-  const startTime = new Date(receipt.startTime);
-  const endTime = new Date(receipt.endTime);
-  if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-    return 'Invalid Date Range';
-  }
-  const duration = endTime.getTime() - startTime.getTime()
-  const hours = Math.floor(duration / (1000 * 60 * 60))
-  const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60))
-  return `${hours}h ${minutes}m`
+const calculateDurationText = (startTime: Date | null, endTime: Date | null): string => {
+    if (!startTime || !endTime) return 'N/A';
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 'Invalid Date Range';
+    
+    const durationMs = end.getTime() - start.getTime();
+    if (durationMs < 0) return 'Invalid Duration';
+    
+    const totalMinutes = Math.ceil(durationMs / (1000 * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}h ${minutes}m (${totalMinutes} min total)`;
 }
 
-const calculateTax = (receipt: Receipt) => {
-  const subtotal = receipt.baseRate + receipt.additionalCharges
-  return subtotal * receipt.taxRate
-}
-
-const calculateTotal = (receipt: Receipt) => {
-  const subtotal = receipt.baseRate + receipt.additionalCharges
-  return subtotal * (1 + receipt.taxRate)
-}
+// Helper function to format amount display (consistent with BookingListView)
+const formatAmountDisplay = (amount: number | null | undefined): string => {
+    if (amount === null || amount === undefined) return '$0.00';
+    const numAmount = Number(amount);
+    if (isNaN(numAmount)) return '$?.??';
+    if (numAmount < 0.01 && numAmount > 0) {
+        return `$${numAmount.toFixed(4)}`; // Show more decimals for small values
+    }
+    return `$${numAmount.toFixed(2)}`;
+};
 
 const downloadReceipt = () => {
   // Implement PDF download logic
@@ -198,43 +198,55 @@ const emailReceipt = () => {
 }
 
 onMounted(async () => {
+  loading.value = true;
+  error.value = '';
   try {
-    // 获取预订详情
-    const bookingRes = await bookingApi.getBookingById(bookingId)
-    const booking = bookingRes.data
-    // 获取付款记录
-    const paymentsRes = await api.get(`/api/payments/booking/${bookingId}`)
-    const payments = paymentsRes.data
-    const payment = payments.length > 0 ? payments[0] : null
-
-    if (!payment) {
-      throw new Error('未找到对应的付款记录')
+    // Fetch Booking details first
+    const bookingRes = await bookingApi.getBookingById(bookingId);
+    const bookingData: Booking = bookingRes.data;
+    if (!bookingData) {
+        throw new Error('Booking not found.');
     }
 
-    // 构建收据数据
+    // Fetch associated Payment details
+    const paymentsRes = await paymentApi.getPaymentsByBooking(bookingId); // Use paymentApi
+    const payments: Payment[] = paymentsRes.data;
+    
+    if (!payments || payments.length === 0) {
+      throw new Error('Payment details not found for this booking.');
+    }
+    // Assuming one payment per completed booking for now
+    const paymentData: Payment = payments[0]; 
+
+    // Populate the receipt ref using fetched data
     receipt.value = {
-      date: payment.completedAt || payment.createdAt,
-      customerName: booking.user.name,
-      customerEmail: booking.user.email,
-      scooterId: booking.scooter.id,
-      startTime: new Date(booking.startTime),
-      endTime: new Date(booking.endTime),
-      location: booking.scooter.location,
-      duration: Math.floor((new Date(booking.endTime).getTime() - new Date(booking.startTime).getTime()) / 60000),
-      baseRate: parseFloat(payment.amount) - (payment.discountAmount ? parseFloat(payment.discountAmount) : 0),
-      additionalCharges: payment.discountAmount ? parseFloat(payment.discountAmount) : 0,
-      taxRate: 0,
-      paymentMethod: payment.paymentMethod,
-      transactionId: payment.transactionId,
-      paymentDate: payment.completedAt ? new Date(payment.completedAt) : new Date(payment.createdAt)
-    }
-    receiptId.value = `R${payment.id}`
-  } catch (err: any) {
-    error.value = err.message || '加载收据失败'
+        bookingId: bookingData.id,
+        date: new Date(), // Use current date for receipt generation date
+        customerName: bookingData.user?.username || 'N/A',
+        customerEmail: bookingData.user?.email || 'N/A',
+        scooterId: bookingData.scooter?.id,
+        scooterModel: bookingData.scooter?.model || 'Standard',
+        startTime: bookingData.startTime ? new Date(bookingData.startTime) : null,
+        endTime: bookingData.endTime ? new Date(bookingData.endTime) : null,
+        location: bookingData.location,
+        durationText: calculateDurationText(bookingData.startTime, bookingData.endTime),
+        totalAmountPaid: paymentData.amount, // Use the amount from the payment record!
+        paymentMethod: paymentData.paymentMethod,
+        transactionId: paymentData.transactionId,
+        paymentDate: paymentData.completedAt ? new Date(paymentData.completedAt) : null,
+        discountApplied: paymentData.hasDiscount || false,
+        discountAmount: paymentData.discountAmount
+    };
+    receiptId.value = `RCPT-${bookingId}-${paymentData.id}`;
+
+  } catch (err: any) { 
+    console.error('Failed to load receipt data:', err);
+    error.value = err.message || 'Could not load receipt data.';
+    receipt.value = null;
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-})
+});
 </script>
 
 <style scoped>

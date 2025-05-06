@@ -5,6 +5,7 @@ import org.example.escooter_booking_system.service.BookingService;
 import org.example.escooter_booking_system.dto.BookingRequestDTO;
 import org.example.escooter_booking_system.dto.BookingExtensionRequestDTO;
 import org.example.escooter_booking_system.dto.StaffBookingRequestDTO;
+import org.example.escooter_booking_system.dto.BookingUserDiscountDTO;
 import jakarta.validation.Valid;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -108,6 +109,19 @@ public class BookingController {
             return ResponseEntity.badRequest().body(null);
         } catch (Exception e) {
             logger.error("Unexpected error during guest booking creation by staff", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/user/{userId}/discount")
+    public ResponseEntity<BookingUserDiscountDTO> getUserDiscountEligibility(@PathVariable Long userId) {
+        try {
+            BookingUserDiscountDTO discountInfo = bookingService.calculateWeeklyUsage(userId);
+            return ResponseEntity.ok(discountInfo);
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            logger.error("Error checking discount eligibility for user {}: {}", userId, e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
     }

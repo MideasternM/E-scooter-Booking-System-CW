@@ -45,6 +45,10 @@ public class Booking {
     @Column // Making it nullable by default
     private String selectedDurationLabel;
 
+    // Add field for discount status
+    @Column(nullable = false)
+    private Boolean hasDiscount = false;
+
     // Getters and Setters
     public Long getId() {
         return id;
@@ -125,5 +129,14 @@ public class Booking {
 
     public void setSelectedDurationLabel(String selectedDurationLabel) {
         this.selectedDurationLabel = selectedDurationLabel;
+    }
+
+    // Add getter/setter for hasDiscount
+    public Boolean getHasDiscount() {
+        return hasDiscount;
+    }
+
+    public void setHasDiscount(Boolean hasDiscount) {
+        this.hasDiscount = hasDiscount;
     }
 }

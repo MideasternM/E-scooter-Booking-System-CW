@@ -18,6 +18,7 @@
                 <option value="date">Sort by Date</option>
                 <option value="scooter">Sort by Scooter ID</option>
                 <option value="type">Sort by Issue Type</option>
+                <option value="severity">Sort by Severity</option>
             </select>
         </div>
 
@@ -34,6 +35,7 @@
                         <th>Scooter</th>
                         <th>Reported By</th>
                         <th>Issue Type</th>
+                        <th>Severity</th>
                         <th>Date</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -46,6 +48,11 @@
                         <td>Scooter #{{ issue.scooterId || 'N/A' }}</td>
                         <td>{{ issue.reportedByName || 'N/A' }}</td>
                         <td>{{ issue.issueType }}</td>
+                        <td>
+                            <span class="severity-badge" :class="(issue.severity || '').toLowerCase()">
+                                {{ issue.severity || 'Unknown' }}
+                            </span>
+                        </td>
                         <td>{{ formatDate(issue.reportDate) }}</td>
                         <td>
                             <!-- Safe status access -->
@@ -98,6 +105,11 @@
                         <div class="detail-section">
                             <h4>Issue Information</h4>
                             <p><strong>Issue Type:</strong> {{ selectedIssue.issueType }}</p>
+                            <p><strong>Severity:</strong> 
+                                <span class="severity-badge" :class="(selectedIssue.severity || '').toLowerCase()">
+                                    {{ selectedIssue.severity || 'Unknown' }}
+                                </span>
+                            </p>
                             <p><strong>Report Date:</strong> {{ formatDateTime(selectedIssue.reportDate) }}</p>
                             <p><strong>Status:</strong>
                                 <span class="status-badge"
@@ -180,6 +192,7 @@ interface ProcessedIssue {
     location?: string; // Location from scooter or report?
     reportDate: Date | null; // Store as Date object
     status: string; // Ensure always string
+    severity?: string; // Added severity field
     photos?: string[] | null;
     resolutionNotes?: string | null;
     // Keep raw data if needed
@@ -219,7 +232,8 @@ const filteredIssues = computed(() => {
             issue.id.toString().includes(query) ||
             issue.scooterId?.toString().includes(query) ||
             issue.issueType.toLowerCase().includes(query) ||
-            (issue.reportedByName || '').toLowerCase().includes(query)
+            (issue.reportedByName || '').toLowerCase().includes(query) ||
+            (issue.severity || '').toLowerCase().includes(query)
         );
     }
 
@@ -238,6 +252,12 @@ const filteredIssues = computed(() => {
             return (a.scooterId ?? 0) - (b.scooterId ?? 0);
         } else if (sortBy.value === 'type') {
             return a.issueType.localeCompare(b.issueType);
+        } else if (sortBy.value === 'severity') {
+            // Sort severity: HIGH > MEDIUM > LOW
+            const severityOrder: Record<string, number> = { 'high': 3, 'medium': 2, 'low': 1, 'unknown': 0 };
+            const severityA = a.severity?.toLowerCase() || 'unknown';
+            const severityB = b.severity?.toLowerCase() || 'unknown';
+            return (severityOrder[severityB] || 0) - (severityOrder[severityA] || 0);
         }
         return 0;
     });
@@ -265,6 +285,7 @@ const fetchIssues = async () => {
                 location: raw.location || raw.scooter?.location || 'Unknown Location',
                 reportDate: parsedDate,
                 status: raw.status || 'Unknown',
+                severity: raw.severity || 'Unknown', // Map severity from API
                 photos: raw.photos,
                 resolutionNotes: raw.resolution || raw.staffNotes,
                 rawIssueData: raw
@@ -450,33 +471,56 @@ h1 {
     border-bottom: 1px solid #eee;
 }
 
+/* Status Badge Styles */
 .status-badge {
     display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: white;
-    text-transform: capitalize;
+    padding: 0.3rem 0.6rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background-color: #e2e8f0;
+    color: #64748b;
 }
 
-.status-badge.pending {
-    background-color: #f39c12;
+.status-badge.pending { background-color: #feb2b2; color: #e53e3e; }
+.status-badge.in-progress { background-color: #bfdbfe; color: #3b82f6; }
+.status-badge.resolved { background-color: #bbf7d0; color: #22c55e; }
+
+/* Severity Badge Styles */
+.severity-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    text-align: center;
+    min-width: 5rem;
 }
 
-.status-badge.in-progress {
-    background-color: #9b59b6;
+.severity-badge.high {
+    background-color: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #ef4444;
 }
 
-.status-badge.resolved {
-    background-color: #3498db;
+.severity-badge.medium {
+    background-color: #fef3c7;
+    color: #d97706;
+    border: 1px solid #f59e0b;
 }
-/* Add style for 'New' status if it exists */
-.status-badge.new {
-    background-color: #e67e22; /* Example: Orange color */
+
+.severity-badge.low {
+    background-color: #dcfce7;
+    color: #16a34a;
+    border: 1px solid #22c55e;
 }
-.status-badge.unknown {
-     background-color: #95a5a6;
+
+.severity-badge.unknown {
+    background-color: #e2e8f0;
+    color: #64748b;
+    border: 1px solid #94a3b8;
 }
 
 .actions-cell {

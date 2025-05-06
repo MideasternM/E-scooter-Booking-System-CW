@@ -129,7 +129,7 @@
                         <div class="form-group">
                             <label>Location:</label>
                             <div class="location-input-group">
-                                <input v-model="newScooterForm.location" type="text" required />
+                            <input v-model="newScooterForm.location" type="text" required />
                                 <button type="button" class="location-btn" @click="getNewScooterLocationFromCoordinates" :disabled="isNewLocationLoading">
                                     {{ isNewLocationLoading ? 'Loading...' : 'Get from Coordinates' }}
                                 </button>
@@ -177,7 +177,7 @@
                         <div class="form-group">
                             <label>Location:</label>
                             <div class="location-input-group">
-                                <input v-model="editScooterForm.location" type="text" required />
+                            <input v-model="editScooterForm.location" type="text" required />
                                 <button type="button" class="location-btn" @click="getLocationFromCoordinates" :disabled="isLocationLoading">
                                     {{ isLocationLoading ? 'Loading...' : 'Get from Coordinates' }}
                                 </button>

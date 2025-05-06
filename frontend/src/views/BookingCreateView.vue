@@ -80,6 +80,17 @@
                         <span v-else-if="priceError" class="error-text">{{ priceError }}</span>
                         <span v-else class="highlight">{{ estimatedPrice }}</span>
                     </p>
+                    <!-- Display discount eligibility info -->
+                    <div v-if="discountInfo && discountInfo.eligibleForDiscount" class="discount-info">
+                        <span class="discount-badge">🎁 20% Discount Applied!</span>
+                        <p class="discount-details">You've used the service for {{ discountInfo.weeklyUsageHours.toFixed(1) }} hours this week.</p>
+                    </div>
+                    <div v-else-if="discountInfo && !discountInfo.eligibleForDiscount" class="discount-progress">
+                        <p>Use the service for {{ (discountInfo.requiredHoursForDiscount - discountInfo.weeklyUsageHours).toFixed(1) }} more hours this week to get a 20% discount!</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" :style="`width: ${(discountInfo.weeklyUsageHours / discountInfo.requiredHoursForDiscount) * 100}%`"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <div v-if="apiError" class="error api-error">{{ apiError }}</div>
@@ -109,6 +120,13 @@ interface Scooter {
     available: boolean;
     imageUrl?: string;
     model?: string; // Add model field
+}
+
+interface DiscountInfo {
+    eligibleForDiscount: boolean;
+    discountRate: number;
+    weeklyUsageHours: number;
+    requiredHoursForDiscount: number;
 }
 
 interface DecodedToken {
@@ -142,6 +160,11 @@ const pricePerMinute = ref<number | null>(null);
 const priceLoading = ref(false);
 const priceError = ref('');
 
+// --- Add state for discount ---
+const discountInfo = ref<DiscountInfo | null>(null);
+const loadingDiscount = ref(false);
+const discountError = ref('');
+
 // --- ADD COMPUTED PROPERTY FOR BUTTON TEXT START ---
 const confirmButtonText = computed(() => {
     if (bookingInProgress.value) {
@@ -168,9 +191,22 @@ const estimatedPrice = computed(() => {
     const rate = pricePerMinute.value; 
     if (rate === null || rate < 0) return 'N/A'; // If rate is invalid/not fetched
     
-    const calculatedPrice = bookingDurationMinutes.value * rate;
+    let calculatedPrice = bookingDurationMinutes.value * rate;
+    
+    // Apply discount if eligible
+    if (discountInfo.value?.eligibleForDiscount) {
+        calculatedPrice *= discountInfo.value.discountRate;
+        // Always show at least 2 decimal places, but show up to 4 for small values
+        if (calculatedPrice < 0.01) {
+            return `$${calculatedPrice.toFixed(4)} (20% discount applied!)`;
+        }
+        return `$${calculatedPrice.toFixed(2)} (20% discount applied!)`;
+    }
 
-    // Format as currency (e.g., $4.50)
+    // Always show at least 2 decimal places, but show up to 4 for small values
+    if (calculatedPrice < 0.01) {
+        return `$${calculatedPrice.toFixed(4)}`;
+    }
     return `$${calculatedPrice.toFixed(2)}`;
 });
 // --- ADD COMPUTED PROPERTY FOR ESTIMATED PRICE END ---
@@ -206,6 +242,25 @@ const getUserIdFromToken = (): number | null => {
     // return 1; // Remove dummy return
 };
 
+// Add a method to check discount eligibility
+const checkDiscountEligibility = async () => {
+    const userId = getUserIdFromToken();
+    if (!userId) return;
+    
+    loadingDiscount.value = true;
+    discountError.value = '';
+    
+    try {
+        const response = await bookingApi.getUserDiscountEligibility(userId);
+        discountInfo.value = response.data;
+        console.log('Discount info:', discountInfo.value);
+    } catch (err: any) {
+        console.error('Failed to get discount info:', err);
+        discountError.value = 'Could not check for discounts';
+    } finally {
+        loadingDiscount.value = false;
+    }
+};
 
 const fetchScooterDetails = async () => {
     loading.value = true
@@ -337,6 +392,7 @@ onMounted(() => {
     // --- RESTORE START ---
     if (props.scooterId) {
         fetchScooterDetails();
+        checkDiscountEligibility(); // Add this to check for discounts
     } else {
         error.value = 'Scooter ID is missing.';
         loading.value = false;
@@ -694,6 +750,55 @@ form {
     color: #e74c3c;
     font-weight: normal;
     font-size: 0.9em;
+}
+
+.discount-info {
+    margin-top: 1rem;
+    background-color: rgba(76, 175, 80, 0.1);
+    padding: 0.8rem;
+    border-radius: 8px;
+    border-left: 4px solid #4caf50;
+}
+
+.discount-badge {
+    display: inline-block;
+    font-weight: 600;
+    color: #4caf50;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.discount-details {
+    color: #2c3e50;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.discount-progress {
+    margin-top: 1rem;
+    background-color: rgba(255, 152, 0, 0.1);
+    padding: 0.8rem;
+    border-radius: 8px;
+    border-left: 4px solid #ff9800;
+}
+
+.discount-progress p {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+}
+
+.progress-bar {
+    height: 8px;
+    background-color: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #ff9800;
+    border-radius: 4px;
 }
 
 @media (max-width: 768px) {

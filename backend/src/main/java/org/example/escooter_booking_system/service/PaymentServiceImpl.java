@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -22,6 +23,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class PaymentServiceImpl implements PaymentService {
@@ -32,8 +34,8 @@ public class PaymentServiceImpl implements PaymentService {
     @Autowired
     private BookingRepository bookingRepository;
 
-    // 假设的费率：每分钟 0.15
-    private static final BigDecimal RATE_PER_MINUTE = new BigDecimal("0.15");
+    @Autowired
+    private AppConfigService appConfigService;
 
     @Override
     @Transactional
@@ -41,42 +43,62 @@ public class PaymentServiceImpl implements PaymentService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new EntityNotFoundException("Booking not found with id: " + bookingId));
 
-        // 检查状态是否为 "Completed"
-        if (!"Completed".equalsIgnoreCase(booking.getStatus())) {
-            throw new IllegalStateException("Booking " + bookingId + " is not completed yet.");
+        if (booking.getStatus() == null || !booking.getStatus().equalsIgnoreCase("Completed")) {
+            throw new IllegalStateException("Payment can only be created for completed bookings.");
         }
 
-        // 检查是否已存在支付记录 (避免重复创建)
         if (paymentRepository.existsByBookingId(bookingId)) {
-            throw new IllegalStateException("Payment already exists for booking " + bookingId);
+            throw new IllegalStateException("Payment already exists for booking: " + bookingId);
         }
 
-        // 检查 startTime 和 endTime 是否存在
-        if (booking.getStartTime() == null || booking.getEndTime() == null) {
-            throw new IllegalStateException(
-                    "Cannot calculate payment for booking ID " + bookingId + " due to missing start or end time.");
-        }
+        // Calculate the FINAL amount to be paid (already includes discount logic)
+        BigDecimal finalAmount = calculateAmountForBooking(booking);
 
-        // 计算时长
-        Instant startTimeInstant = booking.getStartTime().toInstant();
-        Instant endTimeInstant = booking.getEndTime().toInstant();
-        long durationMinutes = Duration.between(startTimeInstant, endTimeInstant).toMinutes();
-        durationMinutes = Math.max(1, durationMinutes); // 最少按1分钟计费
-
-        // 计算金额
-        BigDecimal amount = RATE_PER_MINUTE.multiply(new BigDecimal(durationMinutes));
-
-        // 创建 Payment 对象
-        Instant now = Instant.now();
         Payment payment = new Payment();
         payment.setBooking(booking);
-        payment.setAmount(amount);
-        payment.setPaymentMethod("User");
-        payment.setStatus("COMPLETED");
-        payment.setTransactionId(UUID.randomUUID().toString());
-        payment.setCreatedAt(Timestamp.from(now));
-        payment.setCompletedAt(Timestamp.from(now));
+        payment.setAmount(finalAmount); // Set the final paid amount
+        payment.setPaymentMethod("Credit Card");
+        payment.setTransactionId(generateTransactionId());
         payment.setType("RENTAL_FEE");
+        payment.setStatus("COMPLETED");
+        payment.setCreatedAt(new Date());
+        payment.setCompletedAt(new Date());
+
+        // Set discount flag and calculate the *value* of the discount if applied
+        boolean hasDiscount = booking.getHasDiscount() != null && booking.getHasDiscount();
+        payment.setHasDiscount(hasDiscount);
+
+        if (hasDiscount) {
+            // Calculate the original full price *before* discount
+            long durationMillis = booking.getEndTime().getTime() - booking.getStartTime().getTime();
+            if (durationMillis < 0)
+                durationMillis = 0;
+            long durationMinutes = (long) Math.ceil((double) durationMillis / (1000 * 60));
+            if (durationMillis > 0 && durationMinutes == 0)
+                durationMinutes = 1;
+
+            String scooterModel = booking.getScooter() != null ? booking.getScooter().getModel() : null;
+            BigDecimal baseRate;
+            try {
+                baseRate = appConfigService.getPriceForModel(scooterModel);
+            } catch (Exception e) {
+                System.err.println("Error fetching price for model '" + scooterModel + "' during discount calculation: "
+                        + e.getMessage());
+                baseRate = new BigDecimal("0.20"); // Fallback rate
+            }
+            if (baseRate == null)
+                baseRate = new BigDecimal("0.20"); // Ensure not null
+
+            BigDecimal fullAmount = baseRate.multiply(new BigDecimal(durationMinutes));
+
+            // Calculate the discount amount (20% of full amount)
+            BigDecimal discountRateValue = new BigDecimal("0.20"); // 20% discount rate
+            BigDecimal calculatedDiscountAmount = fullAmount.multiply(discountRateValue)
+                    .setScale(4, RoundingMode.HALF_UP); // Use same scale
+            payment.setDiscountAmount(calculatedDiscountAmount); // Store the value of the discount
+        } else {
+            payment.setDiscountAmount(BigDecimal.ZERO); // Explicitly set to zero if no discount
+        }
 
         return paymentRepository.save(payment);
     }
@@ -189,5 +211,62 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         return dailyIncome;
+    }
+
+    // Calculate payment amount based on booking details
+    private BigDecimal calculateAmountForBooking(Booking booking) {
+        if (booking == null || booking.getStartTime() == null || booking.getEndTime() == null
+                || booking.getScooter() == null) {
+            return BigDecimal.ZERO;
+        }
+
+        // Calculate duration in minutes
+        long durationMillis = booking.getEndTime().getTime() - booking.getStartTime().getTime();
+        if (durationMillis < 0) {
+            durationMillis = 0;
+        }
+        long durationMinutes = (long) Math.ceil((double) durationMillis / (1000 * 60));
+        if (durationMillis > 0 && durationMinutes == 0) {
+            durationMinutes = 1;
+        }
+
+        // Get the model-specific rate from AppConfigService
+        String scooterModel = booking.getScooter().getModel();
+        BigDecimal baseRate;
+        try {
+            baseRate = appConfigService.getPriceForModel(scooterModel);
+        } catch (Exception e) {
+            System.err.println(
+                    "Error fetching price for model '" + scooterModel + "' from AppConfigService: " + e.getMessage());
+            baseRate = new BigDecimal("0.20");
+        }
+
+        if (baseRate == null) {
+            System.err.println("Base rate is null for model '" + scooterModel + "', using default 0.20");
+            baseRate = new BigDecimal("0.20");
+        }
+
+        BigDecimal amount = baseRate.multiply(new BigDecimal(durationMinutes));
+
+        // Apply discount if applicable
+        if (booking.getHasDiscount() != null && booking.getHasDiscount()) {
+            // Apply 20% discount
+            BigDecimal discountRate = new BigDecimal("0.8");
+            amount = amount.multiply(discountRate);
+        }
+
+        // Keep full precision for calculations, round only for final storage/display
+        amount = amount.setScale(4, RoundingMode.HALF_UP);
+
+        return amount;
+    }
+
+    /**
+     * Generates a random transaction ID.
+     * 
+     * @return A random UUID string to use as transaction ID
+     */
+    private String generateTransactionId() {
+        return UUID.randomUUID().toString();
     }
 }

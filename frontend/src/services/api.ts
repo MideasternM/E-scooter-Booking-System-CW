@@ -109,7 +109,7 @@ const adminApi = {
     },
     // 取消预约
     cancelBooking: (id: number) => {
-        return api.put(`/api/bookings/${id}/cancel`)
+        return api.delete(`/api/bookings/${id}`)
     },
     // 获取所有问题报告
     getAllIssues: () => {
@@ -191,8 +191,14 @@ const bookingApi = {
     // --- START: Add extendBooking method ---
     extendBooking: (id: number, newDurationLabel: string) => {
         return api.put(`/api/bookings/${id}/extend`, { newDurationLabel });
-    }
+    },
     // --- END: Add extendBooking method ---
+
+    // --- START: Add getUserDiscountEligibility method ---
+    getUserDiscountEligibility: (userId: number) => {
+        return api.get(`/api/bookings/user/${userId}/discount`);
+    }
+    // --- END: Add getUserDiscountEligibility method ---
 }
 
 // 问题API
@@ -213,8 +219,10 @@ const paymentApi = {
     createPaymentForBooking: (bookingId: number) => {
         return api.post(`/api/payments/booking/${bookingId}`);
     },
-    // 可以在这里添加其他支付相关的 API 调用，例如获取支付详情等
-    // getPaymentById: (paymentId: number) => { ... }
+    // Add method to get payments for a booking
+    getPaymentsByBooking: (bookingId: number) => {
+        return api.get(`/api/payments/booking/${bookingId}`);
+    }
 };
 // --- 添加 paymentApi END ---
 

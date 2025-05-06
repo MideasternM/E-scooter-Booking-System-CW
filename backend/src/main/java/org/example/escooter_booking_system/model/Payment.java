@@ -31,6 +31,9 @@ public class Payment {
     @Column
     private BigDecimal discountAmount;
 
+    @Column
+    private Boolean hasDiscount;
+
     @Column(nullable = false)
     private String type; // RENTAL_FEE, DEPOSIT, REFUND
 
@@ -98,6 +101,14 @@ public class Payment {
 
     public void setDiscountAmount(BigDecimal discountAmount) {
         this.discountAmount = discountAmount;
+    }
+
+    public Boolean getHasDiscount() {
+        return hasDiscount;
+    }
+
+    public void setHasDiscount(Boolean hasDiscount) {
+        this.hasDiscount = hasDiscount;
     }
 
     public String getType() {

@@ -62,7 +62,10 @@
               <p v-if="booking.status !== 'Completed'">Payment pending completion</p>
               <p v-else-if="booking.status === 'Completed' && !booking.payment">Ready to pay</p>
               <p v-else-if="booking.status === 'Completed' && booking.payment">Booking completed</p>
-              <p v-if="booking.payment"><strong>Paid Amount:</strong> ${{ booking.payment.amount.toFixed(2) }}</p>
+              <p v-if="booking.payment">
+                <strong>Paid Amount:</strong> {{ formatAmountDisplay(booking.payment.amount) }}
+                <span v-if="booking.hasDiscount" class="discount-tag">20% Discount Applied</span>
+              </p>
             </div>
           </div>
 
@@ -153,7 +156,8 @@
             <div class="detail-section">
               <h4>Payment Information</h4>
               <p v-if="selectedBookingForDetails.payment">
-                <strong>Amount Paid:</strong> ${{ selectedBookingForDetails.payment.amount.toFixed(2) }}
+                <strong>Amount Paid:</strong> {{ formatAmountDisplay(selectedBookingForDetails.payment.amount) }}
+                <span v-if="selectedBookingForDetails.hasDiscount" class="discount-tag">20% Discount Applied</span>
               </p>
               <p v-else>Payment not yet completed.</p>
             </div>
@@ -197,6 +201,7 @@ interface Booking {
   rawStartTime?: string;
   rawEndTime?: string;
   selectedDurationLabel?: string;
+  hasDiscount?: boolean;
 }
 
 interface DurationOption {
@@ -425,6 +430,17 @@ const closeDetailsModal = () => {
   showDetailsModal.value = false;
   selectedBookingForDetails.value = null;
   document.body.classList.remove('modal-open');
+};
+
+// Helper function to format amount display
+const formatAmountDisplay = (amount: number | null | undefined): string => {
+    if (amount === null || amount === undefined) return '$0.00';
+    const numAmount = Number(amount);
+    if (isNaN(numAmount)) return '$?.??';
+    if (numAmount < 0.01 && numAmount > 0) {
+        return `$${numAmount.toFixed(4)}`; // Show more decimals for small values
+    }
+    return `$${numAmount.toFixed(2)}`;
 };
 
 // Call fetchBookings when component mounts
@@ -1090,6 +1106,17 @@ onMounted(() => {
 }
 .action-button.view:hover {
     background-color: var(--primary-600);
+}
+
+.discount-tag {
+  display: inline-block;
+  background-color: #4caf50;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  margin-left: 6px;
+  font-weight: 600;
 }
 
 </style>

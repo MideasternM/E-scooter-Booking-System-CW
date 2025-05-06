@@ -5,6 +5,7 @@ import org.example.escooter_booking_system.dto.BookingRequestDTO;
 import org.example.escooter_booking_system.dto.BookingDurationPopularityDTO;
 import org.example.escooter_booking_system.dto.BookingExtensionRequestDTO;
 import org.example.escooter_booking_system.dto.StaffBookingRequestDTO;
+import org.example.escooter_booking_system.dto.BookingUserDiscountDTO;
 import org.example.escooter_booking_system.model.Booking;
 import org.example.escooter_booking_system.model.Scooter;
 import org.example.escooter_booking_system.model.User;
@@ -65,6 +66,9 @@ public class BookingServiceImpl implements BookingService {
             throw new IllegalStateException("Scooter with id: " + scooterId + " is not available for booking.");
         }
 
+        // Check if user has a discount based on weekly usage
+        boolean hasDiscount = checkWeeklyUsageDiscount(userId);
+
         Booking newBooking = new Booking();
 
         newBooking.setUser(user);
@@ -82,8 +86,10 @@ public class BookingServiceImpl implements BookingService {
             newBooking.setEndTime(Timestamp.from(reqEndTime));
         }
         newBooking.setStatus("Active");
-
         newBooking.setSelectedDurationLabel(bookingRequest.getSelectedDurationLabel());
+
+        // Set whether the booking has a discount
+        newBooking.setHasDiscount(hasDiscount);
 
         scooter.setAvailable(false);
         scooterRepository.save(scooter);
@@ -327,5 +333,68 @@ public class BookingServiceImpl implements BookingService {
             default:
                 return 0;
         }
+    }
+
+    /**
+     * Checks if the user has used the system for more than 8 hours in the past week
+     * and is eligible for a 20% discount.
+     * 
+     * @param userId The user ID to check
+     * @return true if the user is eligible for a discount, false otherwise
+     */
+    public boolean checkWeeklyUsageDiscount(Long userId) {
+        return calculateWeeklyUsage(userId).isEligibleForDiscount();
+    }
+
+    /**
+     * Calculates the weekly usage for a user and returns discount information.
+     * 
+     * @param userId The user ID to calculate usage for
+     * @return BookingUserDiscountDTO containing usage and discount information
+     */
+    @Override
+    public BookingUserDiscountDTO calculateWeeklyUsage(Long userId) {
+        // Required hours for discount
+        final double REQUIRED_HOURS = 8.0;
+
+        // Get the timestamp from 7 days ago
+        Instant oneWeekAgo = Instant.now().minus(7, ChronoUnit.DAYS);
+        Timestamp oneWeekAgoTimestamp = Timestamp.from(oneWeekAgo);
+
+        // Get all completed bookings for this user in the past week
+        List<Booking> recentBookings = bookingRepository.findCompletedBookingsByUserIdAfterDate(userId,
+                oneWeekAgoTimestamp);
+
+        // Calculate total duration in hours
+        double totalHoursUsed = 0;
+        for (Booking booking : recentBookings) {
+            if (booking.getStartTime() != null && booking.getEndTime() != null) {
+                // Calculate duration between start and end times
+                long durationMillis = booking.getEndTime().getTime() - booking.getStartTime().getTime();
+                double durationHours = durationMillis / (1000.0 * 60 * 60); // Convert to hours
+                totalHoursUsed += durationHours;
+            }
+        }
+
+        logger.info("User {} has used the system for {} hours in the past week", userId, totalHoursUsed);
+
+        // Check if total usage is more than 8 hours
+        boolean eligibleForDiscount = totalHoursUsed >= REQUIRED_HOURS;
+
+        // Build and return the DTO
+        return new BookingUserDiscountDTO(
+                eligibleForDiscount,
+                eligibleForDiscount ? 0.8 : 1.0, // 0.8 = 20% discount
+                totalHoursUsed,
+                REQUIRED_HOURS);
+    }
+
+    /**
+     * Gets the discount rate (0.8 = 20% discount) if the user qualifies for one
+     * 
+     * @return 0.8 if user qualifies for discount, 1.0 otherwise
+     */
+    public double getDiscountRate(Long userId) {
+        return calculateWeeklyUsage(userId).getDiscountRate();
     }
 }

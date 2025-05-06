@@ -309,11 +309,11 @@ const updateMapMarkers = () => {
 
     // Adjust map view if no specific store is selected
     if (!selectedStoreMarker.value && validCoords.length > 1 && mapInstance.value) {
-        try {
-            mapInstance.value.flyToBounds(L.latLngBounds(validCoords), { padding: [50, 50] });
-        } catch(e) {
-            console.error("Error adjusting map bounds:", e);
-        }
+         try {
+             mapInstance.value.flyToBounds(L.latLngBounds(validCoords), { padding: [50, 50] });
+         } catch(e) {
+             console.error("Error adjusting map bounds:", e);
+         }
     }
 };
 
@@ -340,7 +340,7 @@ const setupMapEventListeners = () => {
                     if (scooterId) {
                         console.log('Booking scooter:', scooterId);
                         router.push({ name: 'booking-create', params: { scooterId } });
-                    }
+    }
                 });
             }
         }
