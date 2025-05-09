@@ -51,6 +51,12 @@ This guide helps you set up and deploy the E-scooter Booking System, including d
 
 ## 🏗️ 1. Restore the Database
 
+Before importing the database, make sure the MySQL service is running. On Windows, you can start the service with:
+
+```powershell
+net start MySQL80
+```
+
 ### 1️⃣ Create the Database
 
 Run in MySQL CLI or a GUI tool (like MySQL Workbench):
