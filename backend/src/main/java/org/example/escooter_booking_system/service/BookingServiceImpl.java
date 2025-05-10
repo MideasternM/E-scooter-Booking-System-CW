@@ -164,7 +164,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         Instant endTimeInstant = Instant.now();
-        booking.setStatus("Completed");
+        booking.setStatus("Unpaid");
         booking.setEndTime(Timestamp.from(endTimeInstant));
 
         Booking completedBooking = bookingRepository.save(booking);
@@ -396,5 +396,14 @@ public class BookingServiceImpl implements BookingService {
      */
     public double getDiscountRate(Long userId) {
         return calculateWeeklyUsage(userId).getDiscountRate();
+    }
+
+    @Override
+    @Transactional
+    public Booking updateBookingStatus(Long bookingId, String status) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new EntityNotFoundException("Booking not found with id: " + bookingId));
+        booking.setStatus(status);
+        return bookingRepository.save(booking);
     }
 }

@@ -188,11 +188,23 @@ const confirmPayment = async () => {
 
     try {
         console.log(`Attempting to create payment for booking ${props.bookingId}`);
-        const response = await paymentApi.createPaymentForBooking(Number(props.bookingId));
-        console.log('Payment creation successful:', response.data);
+        // 步骤1: 创建支付记录
+        const createResponse = await paymentApi.createPaymentForBooking(Number(props.bookingId));
+        console.log('Payment creation successful:', createResponse.data);
+        
+        // 步骤2: 使用支付ID处理支付
+        const paymentId = createResponse.data.id;
+        if (!paymentId) {
+            throw new Error('Created payment is missing ID');
+        }
+        
+        // 确保使用数值类型的支付ID
+        const processResponse = await paymentApi.processPayment(Number(paymentId));
+        console.log('Payment processing successful:', processResponse.data);
+        
         paymentSuccess.value = true;
         alert('Payment successful!');
-
+        
     } catch (err: any) {
         console.error('Payment failed:', err);
         paymentError.value = err.response?.data?.message || err.message || 'Payment failed. Please try again.';

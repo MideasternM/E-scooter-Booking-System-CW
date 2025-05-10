@@ -51,4 +51,17 @@ public class PaymentController {
         Payment createdPayment = paymentService.createPaymentForBooking(bookingId);
         return ResponseEntity.ok(createdPayment);
     }
+
+    @PostMapping("/{id}/process")
+    public ResponseEntity<Payment> processPaymentById(@PathVariable Long id) {
+        // 1. 先获取支付记录
+        Payment payment = paymentService.getPaymentById(id);
+        if (payment == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // 2. 处理支付
+        Payment processedPayment = paymentService.processPayment(payment);
+        return ResponseEntity.ok(processedPayment);
+    }
 }

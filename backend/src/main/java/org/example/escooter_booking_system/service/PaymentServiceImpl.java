@@ -37,14 +37,17 @@ public class PaymentServiceImpl implements PaymentService {
     @Autowired
     private AppConfigService appConfigService;
 
+    @Autowired
+    private BookingService bookingService;
+
     @Override
     @Transactional
     public Payment createPaymentForBooking(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new EntityNotFoundException("Booking not found with id: " + bookingId));
 
-        if (booking.getStatus() == null || !booking.getStatus().equalsIgnoreCase("Completed")) {
-            throw new IllegalStateException("Payment can only be created for completed bookings.");
+        if (booking.getStatus() == null || !booking.getStatus().equalsIgnoreCase("Unpaid")) {
+            throw new IllegalStateException("Payment can only be created for unpaid bookings.");
         }
 
         if (paymentRepository.existsByBookingId(bookingId)) {
@@ -60,9 +63,8 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setPaymentMethod("Credit Card");
         payment.setTransactionId(generateTransactionId());
         payment.setType("RENTAL_FEE");
-        payment.setStatus("COMPLETED");
+        payment.setStatus("PENDING");
         payment.setCreatedAt(new Date());
-        payment.setCompletedAt(new Date());
 
         // Set discount flag and calculate the *value* of the discount if applied
         boolean hasDiscount = booking.getHasDiscount() != null && booking.getHasDiscount();
@@ -106,7 +108,15 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public Payment processPayment(Payment payment) {
         payment.setStatus("COMPLETED");
-        return paymentRepository.save(payment);
+        payment.setCompletedAt(new Date());
+        Payment savedPayment = paymentRepository.save(payment);
+
+        // Update booking status to Completed
+        Booking booking = savedPayment.getBooking();
+        if (booking != null && "UNPAID".equalsIgnoreCase(booking.getStatus())) {
+            bookingService.updateBookingStatus(booking.getId(), "Completed");
+        }
+        return savedPayment;
     }
 
     @Override

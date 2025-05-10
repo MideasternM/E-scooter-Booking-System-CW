@@ -33,7 +33,7 @@ public class Booking {
     private Date endTime;
 
     @Column(nullable = false)
-    private String status = "ACTIVE"; // ACTIVE, COMPLETED, CANCELLED, FAULT_REPORTED
+    private String status = "ACTIVE"; // ACTIVE, COMPLETED, CANCELLED, FAULT_REPORTED, UNPAID
 
     @Column(nullable = false)
     private Boolean hasFault = false;
