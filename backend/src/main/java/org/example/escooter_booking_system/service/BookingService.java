@@ -43,5 +43,9 @@ public interface BookingService {
      */
     BookingUserDiscountDTO calculateWeeklyUsage(Long userId);
 
+<<<<<<< HEAD
     void checkAndCompleteOverdueBookings();
+=======
+    Booking updateBookingStatus(Long bookingId, String status);
+>>>>>>> 3e5efcb980aa86ac123ac9efaa518da3b6dae4a0
 }

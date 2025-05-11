@@ -11,6 +11,7 @@
           <option value="active">Active</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
+          <option value="unpaid">Unpaid</option>
         </select>
         <select v-model="sortBy">
           <option value="date">Sort by Date</option>
@@ -59,9 +60,11 @@
 
           <div class="cost-info">
             <div class="cost-details">
-              <p v-if="booking.status !== 'Completed'">Payment pending completion</p>
-              <p v-else-if="booking.status === 'Completed' && !booking.payment">Ready to pay</p>
-              <p v-else-if="booking.status === 'Completed' && booking.payment">Booking completed</p>
+              <p v-if="booking.status.toUpperCase() === 'UNPAID' && !booking.payment">Ready to pay</p>
+              <p v-else-if="booking.status.toUpperCase() === 'COMPLETED' && booking.payment">Booking completed</p>
+              <p v-else-if="booking.status.toUpperCase() === 'ACTIVE'">Payment will be determined after ride completion</p>
+              <p v-else-if="booking.status.toUpperCase() === 'CANCELLED'">Booking cancelled</p>
+              <p v-else-if="booking.status !== 'Completed' && booking.status.toUpperCase() !== 'UNPAID'">Payment pending completion</p>
               <p v-if="booking.payment">
                 <strong>Paid Amount:</strong> {{ formatAmountDisplay(booking.payment.amount) }}
                 <span v-if="booking.hasDiscount" class="discount-tag">20% Discount Applied</span>
@@ -83,7 +86,7 @@
             <button v-if="booking.status === 'Active'" @click="reportIssue(booking)" class="action-button report">
               Report Issue
             </button>
-            <button v-if="booking.status === 'Completed' && !booking.payment" @click="goToPayment(booking)"
+            <button v-if="booking.status.toUpperCase() === 'UNPAID' && !booking.payment" @click="goToPayment(booking)"
               class="action-button pay">
               Pay Now
             </button>
@@ -176,8 +179,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watchEffect } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { bookingApi } from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import { parseISO, format as formatDateFn, formatDistanceStrict, addMinutes, differenceInMinutes } from 'date-fns'
@@ -222,6 +225,7 @@ const searchQuery = ref('')
 const filterStatus = ref('all')
 const sortBy = ref('date')
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 const showExtendModal = ref(false);
@@ -447,6 +451,15 @@ const formatAmountDisplay = (amount: number | null | undefined): string => {
 onMounted(() => {
   fetchBookings()
 })
+
+// 使用watchEffect监测路由变化并刷新数据
+watchEffect(() => {
+  // 当路由参数（如query）发生变化时，重新获取数据
+  // 在PaymentView.vue中跳转时可以加上query参数，如：router.push({path: '/bookings', query: {refresh: Date.now()}})
+  if (route.fullPath) {
+    fetchBookings()
+  }
+})
 </script>
 
 <style scoped>
@@ -551,6 +564,27 @@ onMounted(() => {
 
 .status-badge.cancelled {
   background-color: #e74c3c;
+}
+
+.status-badge.unpaid {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.booking-card.active {
+  border-left-color: #42b983;
+}
+
+.booking-card.completed {
+  border-left-color: #606f7b;
+}
+
+.booking-card.cancelled {
+  border-left-color: #e74c3c;
+}
+
+.booking-card.unpaid {
+  border-left-color: #f59e0b;
 }
 
 .booking-details {

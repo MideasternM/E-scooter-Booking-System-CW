@@ -219,6 +219,10 @@ const paymentApi = {
     createPaymentForBooking: (bookingId: number) => {
         return api.post(`/api/payments/booking/${bookingId}`);
     },
+    // 处理支付并更新订单状态
+    processPayment: (paymentId: number) => {
+        return api.post(`/api/payments/${paymentId}/process`);
+    },
     // Add method to get payments for a booking
     getPaymentsByBooking: (bookingId: number) => {
         return api.get(`/api/payments/booking/${bookingId}`);
