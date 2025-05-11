@@ -42,4 +42,6 @@ public interface BookingService {
      * @return BookingUserDiscountDTO containing usage and discount information
      */
     BookingUserDiscountDTO calculateWeeklyUsage(Long userId);
+
+    void checkAndCompleteOverdueBookings();
 }
