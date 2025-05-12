@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+# SpecStory explanation file
+.specstory/.what-is-this.md
+
+# Ignore the entire .specstory directory
+.specstory/

@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.List;
 
 @Entity
+@Table(name = "app_users")
 @JsonIgnoreProperties({ "bookings", "faultReports" })
 public class User {
     @Id
@@ -15,7 +16,7 @@ public class User {
     @Column // Nullable by default
     private String name;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String username;
 
     @Column(nullable = false)
@@ -28,7 +29,7 @@ public class User {
     @Temporal(TemporalType.TIMESTAMP)
     private Date lastLogin;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String email;
 
     @Column(nullable = false)
