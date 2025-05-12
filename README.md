@@ -49,6 +49,8 @@ This guide helps you set up and deploy the E-scooter Booking System, including d
 
 ---
 
+## You can just visit the website http://1.95.126.154/ (expired at 2025/6/12)
+
 ## 🏗️ 1. Restore the Database
 
 Before importing the database, make sure the MySQL service is running. On Windows, you can start the service with:
