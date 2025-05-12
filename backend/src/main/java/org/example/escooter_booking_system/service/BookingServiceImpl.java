@@ -182,23 +182,37 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public List<Booking> getAllBookings() {
-        return bookingRepository.findAll();
+        try {
+            logger.debug("Fetching all bookings");
+            List<Booking> bookings = bookingRepository.findAll();
+            logger.debug("Successfully fetched {} bookings", bookings.size());
+            return bookings;
+        } catch (Exception e) {
+            logger.error("Error fetching all bookings: {}", e.getMessage(), e);
+            throw e; // 重新抛出异常，让控制器处理
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
     public BookingDurationPopularityDTO getBookingDurationPopularity() {
-        List<Booking> allBookings = bookingRepository.findAll();
+        try {
+            logger.debug("Fetching booking duration popularity");
+            List<Booking> allBookings = bookingRepository.findAll();
 
-        BookingDurationPopularityDTO popularityDTO = new BookingDurationPopularityDTO();
+            BookingDurationPopularityDTO popularityDTO = new BookingDurationPopularityDTO();
 
-        for (Booking booking : allBookings) {
-            popularityDTO.incrementCount(booking.getSelectedDurationLabel());
+            for (Booking booking : allBookings) {
+                popularityDTO.incrementCount(booking.getSelectedDurationLabel());
+            }
+
+            ensureStandardDurationKeys(popularityDTO);
+            logger.debug("Successfully generated booking duration popularity data");
+            return popularityDTO;
+        } catch (Exception e) {
+            logger.error("Error generating booking duration popularity: {}", e.getMessage(), e);
+            throw e; // 重新抛出异常，让控制器处理
         }
-
-        ensureStandardDurationKeys(popularityDTO);
-
-        return popularityDTO;
     }
 
     private void ensureStandardDurationKeys(BookingDurationPopularityDTO dto) {
@@ -210,28 +224,40 @@ public class BookingServiceImpl implements BookingService {
 
     @Scheduled(fixedRate = 60000)
     public void checkAndCompleteOverdueBookings() {
-        Instant now = Instant.now();
-        logger.info("Running scheduled check for overdue bookings at {}", now);
+        try {
+            Instant now = Instant.now();
+            logger.info("Running scheduled check for overdue bookings at {}", now);
 
-        List<Booking> activeBookings = bookingRepository.findByStatusIgnoreCase("Active");
+            List<Booking> activeBookings = bookingRepository.findByStatusIgnoreCase("Active");
+            logger.debug("Found {} active bookings to check", activeBookings.size());
 
-        int completedCount = 0;
-        for (Booking booking : activeBookings) {
-            if (booking.getEndTime() != null && booking.getEndTime().toInstant().isBefore(now)) {
-                logger.info("Found overdue booking ID: {}. Scheduled End Time: {}", booking.getId(),
-                        booking.getEndTime());
+            int completedCount = 0;
+            for (Booking booking : activeBookings) {
                 try {
-                    self.completeBooking(booking.getId());
-                    completedCount++;
-                    logger.info("Successfully auto-completed booking ID: {}", booking.getId());
+                    if (booking.getEndTime() != null && booking.getEndTime().toInstant().isBefore(now)) {
+                        logger.info("Found overdue booking ID: {}. Scheduled End Time: {}", booking.getId(),
+                                booking.getEndTime());
+                        try {
+                            self.completeBooking(booking.getId());
+                            completedCount++;
+                            logger.info("Successfully auto-completed booking ID: {}", booking.getId());
+                        } catch (Exception e) {
+                            logger.error("Error auto-completing booking ID: {}. Reason: {}", booking.getId(),
+                                    e.getMessage(),
+                                    e);
+                        }
+                    }
                 } catch (Exception e) {
-                    logger.error("Error auto-completing booking ID: {}. Reason: {}", booking.getId(), e.getMessage(),
-                            e);
+                    // 捕获单个预订处理过程中的异常，确保其他预订仍然能够被处理
+                    logger.error("Error processing booking ID {} during overdue check: {}",
+                            booking.getId(), e.getMessage(), e);
                 }
             }
-        }
-        if (completedCount > 0) {
-            logger.info("Scheduled task completed {} overdue bookings.", completedCount);
+            if (completedCount > 0) {
+                logger.info("Scheduled task completed {} overdue bookings.", completedCount);
+            }
+        } catch (Exception e) {
+            logger.error("Error in scheduled overdue bookings check: {}", e.getMessage(), e);
         }
     }
 
@@ -280,6 +306,18 @@ public class BookingServiceImpl implements BookingService {
         String durationLabel = request.getSelectedDurationLabel();
         Instant startTime = request.getStartTime() != null ? request.getStartTime() : Instant.now();
 
+        // 添加对请求参数的有效性校验
+        if (guestEmail == null || guestEmail.trim().isEmpty() || !guestEmail.contains("@")) {
+            throw new IllegalArgumentException("Invalid guest email address: " + guestEmail);
+        }
+
+        if (durationLabel == null || durationLabel.trim().isEmpty()) {
+            throw new IllegalArgumentException("Duration label is required");
+        }
+
+        logger.info("Creating guest booking for scooter {}, guest email: {}, duration: {}",
+                scooterId, guestEmail, durationLabel);
+
         Scooter scooter = scooterRepository.findById(scooterId)
                 .orElseThrow(() -> new EntityNotFoundException("Scooter not found with id: " + scooterId));
 
@@ -308,30 +346,65 @@ public class BookingServiceImpl implements BookingService {
         Booking savedBooking = bookingRepository.save(newBooking);
         logger.info("Guest booking created successfully by staff with ID: {}", savedBooking.getId());
 
+        // 将邮件发送的失败处理与预订创建解耦
         try {
             emailService.sendBookingConfirmationToGuest(savedBooking, guestEmail);
+            logger.info("Booking confirmation email sent successfully to guest: {}", guestEmail);
         } catch (Exception e) {
+            // 只记录错误，不影响预订创建的成功返回
             logger.error("Failed to send confirmation email to guest {} for booking ID {}: {}",
                     guestEmail, savedBooking.getId(), e.getMessage());
+            logger.error("Email error details:", e);
         }
 
         return savedBooking;
     }
 
     private long getDurationMinutesFromLabel(String label) {
-        if (label == null)
+        if (label == null || label.trim().isEmpty()) {
+            logger.warn("Received null or empty duration label");
             return 0;
-        switch (label) {
-            case "1 Hour":
-                return 60;
-            case "4 Hours":
-                return 4 * 60;
-            case "1 Day":
-                return 24 * 60;
-            case "1 Week":
-                return 7 * 24 * 60;
-            default:
-                return 0;
+        }
+
+        String normalizedLabel = label.trim();
+        logger.debug("Processing duration label: '{}'", normalizedLabel);
+
+        try {
+            switch (normalizedLabel) {
+                case "1 Hour":
+                    return 60;
+                case "4 Hours":
+                    return 4 * 60;
+                case "1 Day":
+                    return 24 * 60;
+                case "1 Week":
+                    return 7 * 24 * 60;
+                default:
+                    // 尝试解析自定义格式 - 比如 "2 Hours" 或 "30 Minutes"
+                    String[] parts = normalizedLabel.split("\\s+");
+                    if (parts.length == 2) {
+                        try {
+                            double value = Double.parseDouble(parts[0]);
+                            String unit = parts[1].toLowerCase();
+
+                            if (unit.startsWith("hour") || unit.startsWith("hr")) {
+                                return Math.round(value * 60); // 小时转为分钟
+                            } else if (unit.startsWith("minute") || unit.startsWith("min")) {
+                                return Math.round(value); // 已经是分钟
+                            } else if (unit.startsWith("day")) {
+                                return Math.round(value * 24 * 60); // 天转为分钟
+                            }
+                        } catch (NumberFormatException e) {
+                            logger.warn("Failed to parse duration value from: {}", normalizedLabel);
+                        }
+                    }
+
+                    logger.warn("Unrecognized duration label: '{}'", normalizedLabel);
+                    return 0;
+            }
+        } catch (Exception e) {
+            logger.error("Error processing duration label '{}': {}", normalizedLabel, e.getMessage());
+            return 0;
         }
     }
 

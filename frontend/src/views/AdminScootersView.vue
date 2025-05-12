@@ -390,7 +390,7 @@ const guestBookingError = ref<string | null>(null)
 
 // Map state
 const mapInstance = ref<L.Map | null>(null)
-const scooterMarkersLayer = ref<L.LayerGroup | null>(null)
+const scooterMarkersLayer = ref<L.LayerGroup<L.Marker<any>> | null>(null)
 
 // 添加地理编码相关的状态变量
 const isLocationLoading = ref(false)
@@ -630,16 +630,26 @@ const initMap = () => {
     if (mapInstance.value) return;
 
     try {
-        const initialCoords: L.LatLngExpression = [40.7128, -74.0060]; // Example: New York
+        const initialCoords: L.LatLngExpression = [40.7128, -74.0060]; 
         const initialZoom = 10;
 
-        mapInstance.value = L.map('scooter-map').setView(initialCoords, initialZoom);
+        const mapElement = document.getElementById('scooter-map');
+        if (!mapElement) {
+            console.error("Map container element 'scooter-map' not found.");
+            apiError.value = "Map container not found.";
+            return;
+        }
+
+        const map = L.map(mapElement).setView(initialCoords, initialZoom);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(mapInstance.value);
+        }).addTo(map); // Add to local map variable first
 
-        scooterMarkersLayer.value = L.layerGroup().addTo(mapInstance.value);
+        const markers = L.layerGroup<L.Marker<any>>().addTo(map); // Add to local map variable first
+        
+        mapInstance.value = map; // Assign to ref after layers are added
+        scooterMarkersLayer.value = markers; // Assign to ref after layers are added
 
         if (scooters.value.length > 0) {
             updateMapMarkers();
@@ -663,8 +673,7 @@ const updateMapMarkers = () => {
             const coords: L.LatLngExpression = [scooter.latitude, scooter.longitude];
             validCoords.push(coords);
 
-            // Use the custom divIcon when creating the marker
-            const marker = L.marker(coords, { icon: scooterDivIcon });
+            const marker: L.Marker = L.marker(coords, { icon: scooterDivIcon }); 
 
             marker.bindPopup(`
                 <b>Scooter #${scooter.id}</b><br>
@@ -718,24 +727,72 @@ const submitGuestBooking = async () => {
     isGuestBookingLoading.value = true;
     guestBookingError.value = null;
 
-    try {
-        const payload = {
-            scooterId: scooterForGuestBooking.value.id,
-            selectedDurationLabel: guestBookingForm.selectedDurationLabel,
-            guestEmail: guestBookingForm.guestEmail,
-            guestName: guestBookingForm.guestName || undefined // Send undefined if empty
-        };
-        await adminApi.createGuestBooking(payload);
-        alert(`Booking created successfully for guest ${guestBookingForm.guestEmail}! Confirmation email sent.`);
-        closeGuestBookingModal();
-        fetchScooters(); // Refresh scooter list (status might change to 'In Use')
-    } catch (error: any) {
-        console.error("Failed to create guest booking:", error);
-        guestBookingError.value = error.response?.data?.message || error.message || 'Failed to create booking for guest.';
-        // Keep modal open on error
-    } finally {
-        isGuestBookingLoading.value = false;
+    const maxAttempts = 2;
+    let currentAttempt = 0;
+    let success = false;
+
+    const payload = {
+        scooterId: scooterForGuestBooking.value.id,
+        selectedDurationLabel: guestBookingForm.selectedDurationLabel,
+        guestEmail: guestBookingForm.guestEmail,
+        guestName: guestBookingForm.guestName || undefined
+    };
+
+    console.log("Guest booking payload:", payload);
+
+    while (currentAttempt < maxAttempts && !success) {
+        currentAttempt++;
+        try {
+            console.log(`Attempt ${currentAttempt} to create guest booking...`);
+            await adminApi.createGuestBooking(payload); 
+            
+            console.log("Guest booking created successfully!");
+            
+            alert(`Booking created successfully for guest ${guestBookingForm.guestEmail}! An email confirmation should be sent shortly.`);
+            success = true;
+            closeGuestBookingModal();
+            fetchScooters(); 
+            
+        } catch (error: any) {
+            console.error(`Attempt ${currentAttempt} failed:`, error);
+            
+            const errorResponse = error.response;
+            const statusCode = errorResponse?.status;
+            let errorMessage = errorResponse?.data?.message || error.message || 'Unknown error occurred';
+            
+            console.error(`Status: ${statusCode}, Message: ${errorMessage}`);
+            
+            if (currentAttempt >= maxAttempts) {
+                if (statusCode === 500) {
+                    await fetchScooters(); 
+                    const isScooterNowInUse = scooters.value.find(s => 
+                        s.id === scooterForGuestBooking.value?.id && s.status === 'In Use'
+                    );
+                    
+                    if (isScooterNowInUse) {
+                        alert(`Booking was successfully created for guest ${guestBookingForm.guestEmail}, but there was an issue sending the confirmation email. Please inform the guest they may not receive an email.`);
+                        success = true;
+                        closeGuestBookingModal();
+                        return; 
+                    } else {
+                        errorMessage = "Internal server error. This might be due to an email service issue. Please verify the guest's email address or try again later.";
+                    }
+                } else if (statusCode === 404) {
+                    errorMessage = "The selected scooter was not found. It might have been removed or already rented.";
+                } else if (statusCode === 409) {
+                    errorMessage = "This scooter is no longer available. It may have been booked by someone else.";
+                } else if (statusCode === 400) {
+                    errorMessage = "Invalid booking data. Please check the email format and selected duration.";
+                } 
+                
+                guestBookingError.value = `Failed to create booking: ${errorMessage}`;
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
     }
+    
+    isGuestBookingLoading.value = false;
 };
 
 // Simple email validation regex
@@ -934,6 +991,11 @@ watch(scooters, updateMapMarkers, { deep: true });
     border-bottom: 1px solid #ddd;
 }
 
+.data-table th:last-child,
+.data-table td:last-child {
+    text-align: center;
+}
+
 .status-badge {
     padding: 4px 8px;
     border-radius: 12px;
@@ -988,8 +1050,10 @@ watch(scooters, updateMapMarkers, { deep: true });
 
 .actions-cell {
     display: flex;
-    gap: 8px;
-    white-space: nowrap; /* Prevent action buttons from wrapping */
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+    min-width: 280px;
 }
 
 .action-btn {
@@ -1018,13 +1082,6 @@ watch(scooters, updateMapMarkers, { deep: true });
 .action-btn.book-guest {
     background-color: #9b59b6;
     color: white;
-}
-
-.actions-cell .action-btn {
-    margin-right: 0.5rem;
-}
-.actions-cell .action-btn:last-child {
-    margin-right: 0;
 }
 
 .modal-overlay {

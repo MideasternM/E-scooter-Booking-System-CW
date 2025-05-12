@@ -70,14 +70,14 @@
         </div>
       </div>
 
-      <div class="actions">
+      <!-- <div class="actions">
         <button @click="downloadReceipt" class="action-button download">
           Download Receipt (PDF)
         </button>
         <button @click="emailReceipt" class="action-button email">
           Email Receipt
         </button>
-      </div>
+      </div> -->
     </div>
     <div v-else class="error">Could not load receipt data.</div>
   </div>
@@ -186,16 +186,6 @@ const formatAmountDisplay = (amount: number | null | undefined): string => {
     }
     return `$${numAmount.toFixed(2)}`;
 };
-
-const downloadReceipt = () => {
-  // Implement PDF download logic
-  console.log('Downloading receipt...')
-}
-
-const emailReceipt = () => {
-  // Implement email sending logic
-  console.log('Sending receipt by email...')
-}
 
 onMounted(async () => {
   loading.value = true;

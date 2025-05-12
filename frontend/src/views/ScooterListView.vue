@@ -59,6 +59,7 @@ import { adminApi } from '../services/api'
 import { bookingApi } from '../services/api'
 // @ts-ignore 
 import L from 'leaflet';
+import { rentalStoreService } from '../services/rentalStoreService';
 
 interface Scooter {
   id: number;
@@ -69,6 +70,8 @@ interface Scooter {
   longitude?: number | null;
   batteryLevel: number;
   available: boolean;
+  storeId?: number | null;
+  scooterCode?: string;
 }
 
 const scooters = ref<Scooter[]>([])
@@ -76,6 +79,7 @@ const searchQuery = ref('')
 const filterStatus = ref('all')
 const sortBy = ref('id')
 const router = useRouter()
+const storeScooterCodes = ref<string[]>([])
 
 // Define a fixed virtual user location (e.g., near SWJTU South Gate)
 const virtualUserLocation = L.latLng(30.7485, 103.9780);
@@ -109,11 +113,27 @@ const getDistanceToScooter = (scooter: Scooter): string => {
 
 onMounted(async () => {
   try {
+    // 首先，获取所有租赁门店以获取其滑板车代码
+    const stores = await rentalStoreService.getAllStores();
+    
+    // 创建一个包含所有门店滑板车代码的列表
+    storeScooterCodes.value = stores.flatMap(store => store.availableScooters || []);
+    console.log("门店中的滑板车代码:", storeScooterCodes.value);
+    
+    // 然后获取所有滑板车
     const response = await adminApi.getAllScooters()
+    console.log("API返回的原始滑板车数据:", response.data);
+    
     scooters.value = response.data.map((s: any): Scooter => {
+      // 记录每个原始滑板车数据以查看其属性
+      console.log("原始滑板车对象:", s);
+      
       // 分配滑板车图片URL，根据ID选择不同图片
       const imageIndex = (s.id % 4) + 1; // 从4张图片中选择(scooter-1.jpg到scooter-4.jpg)
       const imageUrl = `/images/scooter-${imageIndex}.jpg`;
+      
+      // 确保获取正确的scooterCode字段名
+      const code = s.scooterCode || s.code || String(s.id);
       
       return {
         id: s.id,
@@ -124,17 +144,42 @@ onMounted(async () => {
         longitude: s.longitude,
         batteryLevel: s.batteryLevel ?? 0,
         available: s.available ?? (s.status === 'Available'),
+        storeId: s.storeId ?? null, 
+        scooterCode: code, // 保存滑板车代码
       };
     });
+    
+    console.log("从API映射后的滑板车:", scooters.value.map(s => ({id: s.id, code: s.scooterCode})));
   } catch (error) {
-    console.error('Failed to fetch scooters', error)
+    console.error('获取滑板车失败', error)
   }
 })
 
 const filteredScooters = computed(() => {
   let result = [...scooters.value]
+  
+  // 过滤掉那些代码在任何门店的availableScooters列表中的滑板车
+  result = result.filter(scooter => {
+    // 确保我们以一致的方式处理scooterCode，考虑不同的可能格式
+    const scooterCode = scooter.scooterCode || String(scooter.id);
+    
+    // 检查这个滑板车代码是否在任何门店的列表中
+    const isInStore = storeScooterCodes.value.some(storeCode => {
+      // 尝试不同的比较方式，包括直接比较和数字ID比较
+      return storeCode === scooterCode || 
+             storeCode === String(scooter.id) ||
+             (Number(storeCode) === scooter.id);
+    });
+    
+    if (isInStore) {
+      console.log(`过滤掉滑板车 #${scooter.id}，代码 ${scooterCode}，因为它在门店中`);
+    }
+    return !isInStore;
+  });
+  
+  console.log("按门店过滤后 - 剩余滑板车数量:", result.length);
 
-  // Apply search filter
+  // 应用搜索过滤
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(scooter =>

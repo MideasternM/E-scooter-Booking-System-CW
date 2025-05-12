@@ -14,7 +14,7 @@ public class WebConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/api/**") // Apply CORS to all paths starting with /api/
-                        .allowedOrigins("http://localhost:5173") // Allow your frontend origin
+                        .allowedOrigins("http://1.95.126.154/") // Allow your frontend origin
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // Allowed HTTP methods
                         .allowedHeaders("*") // Allow all headers
                         .allowCredentials(true) // Allow credentials (cookies, auth headers)
@@ -22,7 +22,7 @@ public class WebConfig {
 
                 // Also apply CORS to /pricing/** paths for public pricing API
                 registry.addMapping("/pricing/**")
-                        .allowedOrigins("http://localhost:5173")
+                        .allowedOrigins("http://1.95.126.154/")
                         .allowedMethods("GET", "OPTIONS") // Public pricing likely only needs GET
                         .allowedHeaders("*")
                         .allowCredentials(false) // Public endpoint likely doesn't need credentials

@@ -59,7 +59,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { api } from '../services/api'
 
 const staffNumber = ref('')
 const phoneNumber = ref('')
@@ -90,7 +90,7 @@ const handleRegister = async () => {
 
     try {
         // Call the API to register admin
-        await axios.post('/api/staff/register', {
+        await api.post('/api/staff/register', {
             staffNumber: staffNumber.value,
             phoneNumber: staffNumber.value,
             name: fullName.value,

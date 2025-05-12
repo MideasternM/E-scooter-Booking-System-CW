@@ -8,15 +8,26 @@ import org.springframework.data.repository.query.Param;
 
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-    @EntityGraph(attributePaths = { "payment", "user", "scooter" })
+    @EntityGraph(attributePaths = { "payment", "user", "scooter" }, type = EntityGraph.EntityGraphType.FETCH)
     List<Booking> findByUserId(Long userId);
+
+    @EntityGraph(attributePaths = { "payment", "user", "scooter" }, type = EntityGraph.EntityGraphType.FETCH)
+    @Override
+    Optional<Booking> findById(Long id);
+
+    // 重写 findAll 方法，使用 EntityGraph 确保使用 LEFT JOIN
+    @EntityGraph(attributePaths = { "payment", "user", "scooter" }, type = EntityGraph.EntityGraphType.FETCH)
+    @Override
+    List<Booking> findAll();
 
     List<Booking> findByScooterId(Long scooterId);
 
     List<Booking> findByStatus(String status);
 
+    @EntityGraph(attributePaths = { "payment", "user", "scooter" }, type = EntityGraph.EntityGraphType.FETCH)
     List<Booking> findByStatusIgnoreCase(String status);
 
     /**
@@ -27,6 +38,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      * @param date   Date after which to find bookings
      * @return List of completed bookings for the user after the specified date
      */
-    @Query("SELECT b FROM Booking b WHERE b.user.id = :userId AND b.status = 'Completed' AND b.endTime >= :date")
+    @Query("SELECT b FROM Booking b WHERE b.user IS NOT NULL AND b.user.id = :userId AND b.status = 'Completed' AND b.endTime >= :date")
     List<Booking> findCompletedBookingsByUserIdAfterDate(@Param("userId") Long userId, @Param("date") Timestamp date);
 }

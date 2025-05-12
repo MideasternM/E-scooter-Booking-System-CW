@@ -29,8 +29,15 @@ public class BookingController {
 
     @GetMapping
     public ResponseEntity<List<Booking>> getAllBookings() {
-        List<Booking> bookings = bookingService.getAllBookings();
-        return ResponseEntity.ok(bookings);
+        try {
+            logger.info("Fetching all bookings");
+            List<Booking> bookings = bookingService.getAllBookings();
+            logger.info("Successfully fetched {} bookings", bookings.size());
+            return ResponseEntity.ok(bookings);
+        } catch (Exception e) {
+            logger.error("Error fetching all bookings: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @PostMapping
@@ -66,8 +73,21 @@ public class BookingController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> cancelBooking(@PathVariable Long id) {
-        bookingService.cancelBooking(id);
-        return ResponseEntity.noContent().build();
+        try {
+            logger.info("Attempting to cancel booking with ID: {}", id);
+            bookingService.cancelBooking(id);
+            logger.info("Successfully cancelled booking with ID: {}", id);
+            return ResponseEntity.noContent().build();
+        } catch (EntityNotFoundException e) {
+            logger.error("Booking not found for cancellation: {}", e.getMessage());
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            logger.error("Cannot cancel booking in current state: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        } catch (Exception e) {
+            logger.error("Unexpected error during booking cancellation for ID {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @PutMapping("/{id}/complete")
@@ -96,7 +116,9 @@ public class BookingController {
     public ResponseEntity<Booking> createGuestBookingByStaff(
             @Valid @RequestBody StaffBookingRequestDTO request) {
         try {
+            logger.info("Received guest booking request: {}", request);
             Booking createdBooking = bookingService.createBookingForGuestByStaff(request);
+            logger.info("Successfully created guest booking with ID: {}", createdBooking.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(createdBooking);
         } catch (EntityNotFoundException e) {
             logger.error("Entity not found during guest booking creation: {}", e.getMessage());
@@ -109,6 +131,7 @@ public class BookingController {
             return ResponseEntity.badRequest().body(null);
         } catch (Exception e) {
             logger.error("Unexpected error during guest booking creation by staff", e);
+            e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
     }

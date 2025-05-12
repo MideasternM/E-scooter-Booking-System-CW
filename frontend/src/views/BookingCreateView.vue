@@ -100,15 +100,15 @@
                 </button>
             </form>
         </div>
-        <router-link to="/scooters" class="back-button">
-            <span>&larr;</span> Back to Scooter List
+        <router-link :to="backLink" class="back-button">
+            <span>&larr;</span> {{ backButtonText }}
         </router-link>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { api, bookingApi, pricingApi } from '../services/api' // Remove scooterApi, keep api and bookingApi
 import { jwtDecode } from 'jwt-decode'; // Import jwt-decode
 
@@ -147,6 +147,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const route = useRoute() // Add useRoute
 
 const loading = ref(true)
 const error = ref('')
@@ -164,6 +165,28 @@ const priceError = ref('');
 const discountInfo = ref<DiscountInfo | null>(null);
 const loadingDiscount = ref(false);
 const discountError = ref('');
+
+// Computed property for the back link
+const backLink = computed(() => {
+  const fromStoreId = route.query.fromStore;
+  if (fromStoreId) {
+    // Potentially, you might want a more specific store detail page if you have one
+    // For now, linking back to the rental store list or a specific store view.
+    // Assuming a route like /rental-stores/:id or /rental-stores
+    // If your store page is just RentalStoreListView, then it would be:
+    return `/rental-stores`; // Or `/rental-stores/${fromStoreId}` if you have a detail view for stores
+  }
+  return '/scooters'; // Default back link
+});
+
+// Computed property for back button text
+const backButtonText = computed(() => {
+  const fromStoreId = route.query.fromStore;
+  if (fromStoreId) {
+    return 'Back to Store';
+  }
+  return 'Back to Scooter List';
+});
 
 // --- ADD COMPUTED PROPERTY FOR BUTTON TEXT START ---
 const confirmButtonText = computed(() => {

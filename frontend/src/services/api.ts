@@ -15,7 +15,7 @@ interface ModelPricesResponse {
 
 // axios实例
 const api = axios.create({
-    baseURL: 'http://localhost:8080', // 服务器地址
+    baseURL: 'http://1.95.126.154:8080', // 服务器地址
     timeout: 10000, // 请求超时时间
     headers: {
         'Content-Type': 'application/json'

@@ -32,7 +32,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { api } from '../services/api'
 
 const staffNumber = ref('')
 const password = ref('')
@@ -45,8 +45,7 @@ const handleLogin = async () => {
     error.value = ''
 
     try {
-        // ????????????????????????API???
-        const response = await axios.post('/api/staff/login', {
+        const response = await api.post('/api/staff/login', {
             staffNumber: staffNumber.value,
             password: password.value
         })

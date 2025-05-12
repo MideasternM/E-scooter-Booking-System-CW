@@ -345,13 +345,12 @@ const cancelBooking = async () => {
     if (!cancellingBooking.value) return;
     try {
         await adminApi.cancelBooking(cancellingBooking.value.id);
-        alert(`预订 #${cancellingBooking.value.id} 已成功取消。`);
+        alert('Booking cancelled successfully!');
         closeCancelModal();
-        cancellingBooking.value = null;
-        fetchBookings(); // 刷新列表
+        fetchBookings(); // Refresh booking list
     } catch (error: any) {
-        console.error('取消预订失败:', error);
-        alert(`取消预订失败: ${error.message || '未知错误'}`);
+        console.error('Error cancelling booking:', error);
+        alert(`Failed to cancel booking: ${error.response?.data?.message || error.message}`);
     }
 };
 

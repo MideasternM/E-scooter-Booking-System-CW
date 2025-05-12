@@ -177,12 +177,14 @@ const bookScooter = (scooter: Scooter) => {
     model: scooter.model
   }));
   
+  const storeId = selectedStoreForModal.value?.id;
+
   // 关闭模态框
   closeScooterModal();
   
   // 跳转到预订创建页面
-  console.log(`Navigating to: /booking/create/${scooter.id}`);
-  router.push(`/booking/create/${scooter.id}`);
+  console.log(`Navigating to: /booking/create/${scooter.id}${storeId ? '?fromStore=' + storeId : ''}`);
+  router.push(`/booking/create/${scooter.id}${storeId ? '?fromStore=' + storeId : ''}`);
 };
 // --- END: 模态框逻辑 ---
 

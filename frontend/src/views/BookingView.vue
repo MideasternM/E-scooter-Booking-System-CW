@@ -26,12 +26,22 @@
 
 <script lang="ts">
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { api } from '../services/api'
 import { useAuthStore } from '../stores/auth'
+
+// Define booking interface
+interface Booking {
+    id: number;
+    scooterId: number;
+    startTime: string;
+    endTime: string;
+    status: string;
+    // Add other fields if needed
+}
 
 export default {
     setup() {
-        const bookings = ref([])
+        const bookings = ref<Booking[]>([])
         const loading = ref(true)
         const error = ref('')
         const authStore = useAuthStore()
@@ -47,7 +57,7 @@ export default {
                     return
                 }
                 
-                const response = await axios.get(`/api/bookings/user/${userId}`)
+                const response = await api.get<Booking[]>(`/api/bookings/user/${userId}`)
                 bookings.value = response.data
             } catch (err) {
                 console.error('Failed to fetch bookings:', err)
@@ -59,7 +69,7 @@ export default {
 
         const cancelBooking = async (bookingId: number) => {
             try {
-                await axios.delete(`/api/bookings/${bookingId}`)
+                await api.delete(`/api/bookings/${bookingId}`)
                 alert('Booking cancelled successfully!')
                 fetchBookings()
             } catch (err) {

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { api } from './api';
 import type { Scooter } from '@/types/Scooter';
 
 // API Base URL
@@ -10,7 +10,7 @@ export const scooterService = {
      */
     async getAllScooters(): Promise<Scooter[]> {
         try {
-            const response = await axios.get(API_URL);
+            const response = await api.get(API_URL);
             return response.data;
         } catch (error) {
             console.error('Error fetching scooters:', error);
@@ -23,7 +23,7 @@ export const scooterService = {
      */
     async getScooterById(id: number): Promise<Scooter> {
         try {
-            const response = await axios.get(`${API_URL}/${id}`);
+            const response = await api.get(`${API_URL}/${id}`);
             return response.data;
         } catch (error) {
             console.error(`Error fetching scooter ${id}:`, error);
@@ -36,7 +36,7 @@ export const scooterService = {
      */
     async updateScooterStatus(id: number, status: string): Promise<Scooter> {
         try {
-            const response = await axios.patch(`${API_URL}/${id}/status`, { status });
+            const response = await api.patch(`${API_URL}/${id}/status`, { status });
             return response.data;
         } catch (error) {
             console.error(`Error updating scooter ${id} status:`, error);
@@ -49,7 +49,7 @@ export const scooterService = {
      */
     async getAvailableScooters(): Promise<Scooter[]> {
         try {
-            const response = await axios.get(`${API_URL}/available`);
+            const response = await api.get(`${API_URL}/available`);
             return response.data;
         } catch (error) {
             console.error('Error fetching available scooters:', error);

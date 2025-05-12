@@ -10,6 +10,8 @@ import org.example.escooter_booking_system.dto.DailyIncomeDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -27,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class PaymentServiceImpl implements PaymentService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PaymentServiceImpl.class);
 
     @Autowired
     private PaymentRepository paymentRepository;
@@ -142,29 +146,39 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional(readOnly = true)
     public WeeklyIncomeBreakdownDTO getWeeklyIncomeBreakdown() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek());
-        if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) {
-            cal.add(Calendar.DATE, 1);
-        }
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        Date weekStartDate = cal.getTime();
+        // 使用 java.time API 计算当前周的日期范围
+        LocalDateTime now = LocalDateTime.now();
+        // 回到过去 7 天作为一周的开始（而不是 30 天）
+        LocalDateTime startOfWeek = now.minusDays(7);
+        LocalDateTime endOfWeek = now.plusDays(1); // 加1天确保包含今天的记录
 
-        cal.add(Calendar.DATE, 6);
-        cal.set(Calendar.HOUR_OF_DAY, 23);
-        cal.set(Calendar.MINUTE, 59);
-        cal.set(Calendar.SECOND, 59);
-        cal.set(Calendar.MILLISECOND, 999);
-        Date weekEndDate = cal.getTime();
+        Date weekStartDate = Date.from(startOfWeek.atZone(ZoneId.systemDefault()).toInstant());
+        Date weekEndDate = Date.from(endOfWeek.atZone(ZoneId.systemDefault()).toInstant());
+
+        // 保留增强的日志输出
+        logger.info("Fetching weekly income breakdown from {} to {}", weekStartDate, weekEndDate);
+        logger.info("ISO dates: from {} to {}",
+                LocalDateTime.ofInstant(weekStartDate.toInstant(), ZoneId.systemDefault()),
+                LocalDateTime.ofInstant(weekEndDate.toInstant(), ZoneId.systemDefault()));
 
         List<Payment> weeklyPayments = paymentRepository.findCompletedRentalFeesBetweenDates(
                 "RENTAL_FEE",
                 "COMPLETED",
                 weekStartDate,
                 weekEndDate);
+
+        // 保留帮助诊断的日志
+        if (weeklyPayments.size() > 0) {
+            Payment firstPayment = weeklyPayments.get(0);
+            logger.info("First payment: id={}, amount={}, completedAt={}, type={}, status={}",
+                    firstPayment.getId(),
+                    firstPayment.getAmount(),
+                    firstPayment.getCompletedAt(),
+                    firstPayment.getType(),
+                    firstPayment.getStatus());
+        }
+
+        logger.info("Found {} completed rental payments for weekly breakdown", weeklyPayments.size());
 
         WeeklyIncomeBreakdownDTO breakdown = new WeeklyIncomeBreakdownDTO();
 
@@ -185,29 +199,39 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional(readOnly = true)
     public DailyIncomeDTO getDailyIncomeForCurrentWeek() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek());
-        if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) {
-            cal.add(Calendar.DATE, 1);
-        }
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        Date weekStartDate = cal.getTime();
+        // 使用 java.time API 计算当前周的日期范围
+        LocalDateTime now = LocalDateTime.now();
+        // 回到过去 7 天作为一周的开始（而不是 30 天）
+        LocalDateTime startOfWeek = now.minusDays(7);
+        LocalDateTime endOfWeek = now.plusDays(1); // 加1天确保包含今天的记录
 
-        cal.add(Calendar.DATE, 6);
-        cal.set(Calendar.HOUR_OF_DAY, 23);
-        cal.set(Calendar.MINUTE, 59);
-        cal.set(Calendar.SECOND, 59);
-        cal.set(Calendar.MILLISECOND, 999);
-        Date weekEndDate = cal.getTime();
+        Date weekStartDate = Date.from(startOfWeek.atZone(ZoneId.systemDefault()).toInstant());
+        Date weekEndDate = Date.from(endOfWeek.atZone(ZoneId.systemDefault()).toInstant());
+
+        // 保留增强的日志输出
+        logger.info("Fetching daily income for current week from {} to {}", weekStartDate, weekEndDate);
+        logger.info("ISO dates: from {} to {}",
+                LocalDateTime.ofInstant(weekStartDate.toInstant(), ZoneId.systemDefault()),
+                LocalDateTime.ofInstant(weekEndDate.toInstant(), ZoneId.systemDefault()));
 
         List<Payment> weeklyPayments = paymentRepository.findCompletedRentalFeesBetweenDates(
                 "RENTAL_FEE",
                 "COMPLETED",
                 weekStartDate,
                 weekEndDate);
+
+        // 保留帮助诊断的日志
+        if (weeklyPayments.size() > 0) {
+            Payment firstPayment = weeklyPayments.get(0);
+            logger.info("First payment: id={}, amount={}, completedAt={}, type={}, status={}",
+                    firstPayment.getId(),
+                    firstPayment.getAmount(),
+                    firstPayment.getCompletedAt(),
+                    firstPayment.getType(),
+                    firstPayment.getStatus());
+        }
+
+        logger.info("Found {} completed rental payments for daily income", weeklyPayments.size());
 
         DailyIncomeDTO dailyIncome = new DailyIncomeDTO();
 
